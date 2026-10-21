@@ -23,6 +23,9 @@ def _configure_logging() -> None:
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(logging.INFO)
+    # sqlglot warns (echoing the SQL) whenever it falls back to a Command node; the
+    # classifier already refuses those, so the warning is noise.
+    logging.getLogger("sqlglot").setLevel(logging.ERROR)
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
