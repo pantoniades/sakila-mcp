@@ -51,6 +51,57 @@ the standalone `fastmcp` package. If you are unsure of a v2 API, read the docs o
   syntax differences. Never gate on edition/license.
 - When a MySQL behavior is version-dependent and you are not certain, STOP and ask.
   Do not guess. List it as an open question in your summary.
+- Release lines (confirmed by the user): 8.0, 8.4, 9.7 = LTS; 8.1–8.3 and 9.0–9.6 =
+  Innovation; calendar lines 26.x–28.x = Innovation (through 2028); 29+ = "unknown"
+  until told otherwise.
+
+## Verified facts (learned the hard way — do not re-derive)
+
+MCP SDK v2 (mcp 2.3.0):
+- `from mcp.server import MCPServer`; `ToolError` from `mcp.server.mcpserver.exceptions`.
+- Pydantic models are snake_case at runtime: `tool.annotations.read_only_hint`,
+  `tool.output_schema`, `result.structured_content`, `result.is_error`. camelCase
+  (`readOnlyHint=`) only works as a constructor alias.
+- Sync `def` tools run on worker threads (right for the blocking connector).
+- `read_resource()` returns `Iterable[...] | InputRequiredResult`; narrow it.
+- The stdio server exits on stdin EOF and abandons in-flight requests. Tests must keep
+  stdin open until the response arrives.
+- No async lifespan: `main()` opens `Database` before `run("stdio")` and passes it to
+  `build_server(config, database)`.
+
+sqlglot (30.x, MySQL dialect):
+- Function names are normalized (`NVL`/`IFNULL` → `COALESCE`, `STRING_AGG` →
+  `GroupConcat`) and special forms have no source `meta`. Never decide "is builtin"
+  from the AST: the classifier detects calls from tokens (`name` followed by `(`).
+- Not parsed: `TABLE t` (misparsed as an alias), `INTO` after `FROM`,
+  `SHOW BINARY LOG STATUS`, `SHOW KEYS IN t IN db` (fall back to `Command`). Hence
+  token-level INTO/locking checks and a hand-written SHOW matcher.
+- Import `Token`, `TokenType` from `sqlglot.tokenizer_core`; type trees as `exp.Expr`.
+- The tokenizer assumes backslash escapes and `"` = string. Session init therefore
+  strips `NO_BACKSLASH_ESCAPES`, `ANSI_QUOTES` and `ANSI` from the session sql_mode and
+  fails closed if they stick.
+
+mysql-connector-python (26.x):
+- Do NOT use `MySQLConnectionPool`: its config check (C extension) mutates the shared
+  `conn_attrs` dict, the attribute block exceeds 255 bytes, and the connector's 1-byte
+  length encoding crashes. `pool.Database` is our own small pool with a fresh
+  `connect_args()` per connection.
+- Auth-plugin name on failure is read defensively from connector internals
+  (`_authenticator._auth_strategy.name`, then `_handshake["auth_plugin"]`). Never make
+  a second login attempt to diagnose (account lockout risk).
+- `VECTOR` columns come back as `array('f', ...)`.
+- The connector logs auth-plugin selection at INFO; `__main__` sets it to WARNING.
+
+## Dev environment
+- Docker is forbidden on this machine; there is no docker-compose.yml.
+- The user installs system tooling (uv, MySQL, …) themselves; ask, don't install.
+- Integration tests run against a local MySQL 9.7.1 Enterprise server prepared with
+  `tests/integration/setup.sql` (schemas `mysql_mcp_test`, `mysql_mcp_other`; account
+  `mysql_mcp_test@127.0.0.1`). The DSN comes from `MYSQL_MCP_TEST_DSN` or the gitignored
+  `.env.test`. Never print the DSN or password; keep `CHANGE_ME` in `setup.sql`.
+- That server: `require_secure_transport=ON` (TLS-less auth test skips),
+  `lower_case_table_names=2`, `explain_json_format_version=2`; the test account cannot
+  see `sys` or read `performance_schema` unless granted.
 
 ## Working style
 - Propose, then wait for OK, before any structural change.
