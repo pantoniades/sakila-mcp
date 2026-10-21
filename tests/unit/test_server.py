@@ -5,14 +5,30 @@ from pathlib import Path
 import pytest
 
 from mysql_mcp.config import Config
-from mysql_mcp.server import SERVER_NAME, build_server
+from mysql_mcp.pool import Database
+from mysql_mcp.server import CAPABILITIES_URI, SERVER_NAME, build_server
 
 
 @pytest.mark.anyio
-async def test_server_lists_zero_tools() -> None:
-    server = build_server(Config(user="mcp"))
+async def test_tools_registered_read_only() -> None:
+    config = Config(user="mcp")
+    server = build_server(config, Database(config))
     assert server.name == SERVER_NAME
-    assert await server.list_tools() == []
+    tools = await server.list_tools()
+    assert [t.name for t in tools] == ["server_info"]
+    for tool in tools:
+        assert tool.annotations is not None
+        assert tool.annotations.read_only_hint is True
+        assert tool.description
+        assert tool.output_schema is not None
+
+
+@pytest.mark.anyio
+async def test_capabilities_resource_registered() -> None:
+    config = Config(user="mcp")
+    server = build_server(config, Database(config))
+    resources = await server.list_resources()
+    assert [str(r.uri) for r in resources] == [CAPABILITIES_URI]
 
 
 def test_help_runs() -> None:

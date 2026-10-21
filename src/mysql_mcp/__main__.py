@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from mysql_mcp import __version__
 from mysql_mcp.config import Config, load_config
+from mysql_mcp.pool import Database, DatabaseError
 from mysql_mcp.safety.redact import RedactingFilter, redact_exception, register_secret
 from mysql_mcp.server import build_server
 
@@ -26,6 +27,8 @@ def _configure_logging() -> None:
     # sqlglot warns (echoing the SQL) whenever it falls back to a Command node; the
     # classifier already refuses those, so the warning is noise.
     logging.getLogger("sqlglot").setLevel(logging.ERROR)
+    # The connector logs auth-plugin selection at INFO on every connect.
+    logging.getLogger("mysql.connector").setLevel(logging.WARNING)
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -59,9 +62,18 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = _parse_args(argv)
     _configure_logging()
     config = _load(args.config)
-    server = build_server(config)
+    database = Database(config)
+    try:
+        database.open()
+    except DatabaseError as exc:
+        log.error("%s", exc)
+        raise SystemExit(1) from None
+    server = build_server(config, database)
     log.info("mysql-mcp %s starting on stdio", __version__)
-    server.run("stdio")
+    try:
+        server.run("stdio")
+    finally:
+        database.close()
 
 
 if __name__ == "__main__":
