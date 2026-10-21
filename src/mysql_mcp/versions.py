@@ -36,6 +36,8 @@ def release_line(version: Version) -> str:
         return "Innovation"
     if major == 9:
         return "Innovation"
-    # Calendar-versioned releases (major >= 26) are reported as "unknown" until the
-    # LTS/Innovation rule for that scheme is confirmed.
+    # Calendar-versioned lines 26-28 are all Innovation releases (through 2028).
+    # Later lines stay "unknown" until their LTS designation is known.
+    if 26 <= major <= 28:
+        return "Innovation"
     return "unknown"

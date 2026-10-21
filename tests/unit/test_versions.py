@@ -42,7 +42,10 @@ def test_tuple_comparison_orders_calendar_after_classic() -> None:
         ((8, 3, 0), "Innovation"),
         ((9, 0, 1), "Innovation"),
         ((9, 6, 0), "Innovation"),
-        ((26, 10, 0), "unknown"),
+        ((26, 10, 0), "Innovation"),
+        ((27, 4, 1), "Innovation"),
+        ((28, 1, 0), "Innovation"),
+        ((29, 1, 0), "unknown"),
         ((5, 7, 44), "unknown"),
     ],
 )
