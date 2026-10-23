@@ -26,7 +26,9 @@ from sakila_mcp.safety.redact import redact
 SERVER_NAME = "sakila-mcp"
 CAPABILITIES_URI = "mysql://capabilities"
 
-READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+SERVER_TITLE = "Sakila MCP"
+
+READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False)
 
 _SERVER_INFO_VARIABLES = (
     "innodb_buffer_pool_size",
@@ -90,6 +92,7 @@ def build_server(config: Config, database: Database) -> MCPServer:
     database_pool = database  # tools take a ``database`` argument that shadows the name
     server = MCPServer(
         SERVER_NAME,
+        title=SERVER_TITLE,
         version=__version__,
         instructions="Read-only access to one MySQL server: schema inspection and bounded "
         "queries. Read mysql://capabilities for the server version and feature support.",
@@ -116,6 +119,7 @@ def build_server(config: Config, database: Database) -> MCPServer:
             row = cursor.fetchone()
             cursor.close()
         return ServerInfo(
+            sakila_mcp_version=__version__,
             version_raw=caps.version_raw,
             version=caps.version,
             release_line=caps.release_line,
@@ -190,6 +194,6 @@ def build_server(config: Config, database: Database) -> MCPServer:
         mime_type="application/json",
     )
     def capabilities() -> str:
-        return json.dumps(asdict(database.capabilities))
+        return json.dumps({"sakila_mcp_version": __version__, **asdict(database.capabilities)})
 
     return server

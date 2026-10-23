@@ -4,6 +4,8 @@ from pydantic import BaseModel
 
 
 class ServerInfo(BaseModel):
+    # This MCP server's own version; every other field describes the MySQL server.
+    sakila_mcp_version: str
     version_raw: str
     version: tuple[int, int, int]
     release_line: str

@@ -3,10 +3,12 @@ import sys
 from pathlib import Path
 
 import pytest
+from mcp.client import Client
 
+from sakila_mcp import __version__
 from sakila_mcp.config import Config
 from sakila_mcp.pool import Database
-from sakila_mcp.server import CAPABILITIES_URI, SERVER_NAME, build_server
+from sakila_mcp.server import CAPABILITIES_URI, SERVER_NAME, SERVER_TITLE, build_server
 
 
 @pytest.mark.anyio
@@ -26,6 +28,22 @@ async def test_tools_registered_read_only() -> None:
         assert tool.annotations.read_only_hint is True
         assert tool.description
         assert tool.output_schema is not None
+
+
+@pytest.mark.anyio
+async def test_initialize_advertises_name_and_version() -> None:
+    config = Config(user="mcp")
+    async with Client(build_server(config, Database(config))) as client:
+        info = client.server_info
+        tools = await client.list_tools()
+    assert info is not None
+    assert info.name == SERVER_NAME == "sakila-mcp"
+    assert info.title == SERVER_TITLE
+    assert info.version == __version__
+    for tool in tools.tools:
+        assert tool.annotations is not None
+        wire = tool.annotations.model_dump(by_alias=True, exclude_none=True)
+        assert wire == {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False}
 
 
 @pytest.mark.anyio

@@ -12,6 +12,7 @@ import pytest
 from mcp.types import CallToolResult, InputRequiredResult
 from mysql.connector.connection import MySQLConnection
 
+from sakila_mcp import __version__
 from sakila_mcp.config import Config
 from sakila_mcp.pool import STRIPPED_SQL_MODES, Database, DatabaseError
 from sakila_mcp.server import CAPABILITIES_URI, build_server
@@ -140,6 +141,7 @@ async def test_server_info_tool(database: Database, config: Config) -> None:
     assert not result.is_error
     info = result.structured_content
     assert info is not None
+    assert info["sakila_mcp_version"] == __version__
     assert info["version_raw"] == database.capabilities.version_raw
     assert info["version"] == list(database.capabilities.version)
     assert info["uptime_seconds"] > 0
@@ -158,7 +160,9 @@ async def test_capabilities_resource(database: Database, config: Config) -> None
     data = json.loads(str(contents[0].content))
     assert data["version_raw"] == database.capabilities.version_raw
     assert data["release_line"] == database.capabilities.release_line
+    assert data["sakila_mcp_version"] == __version__
     assert set(data) == {
+        "sakila_mcp_version",
         "version",
         "version_raw",
         "version_comment",

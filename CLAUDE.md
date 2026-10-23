@@ -39,7 +39,7 @@ the standalone `fastmcp` package. If you are unsure of a v2 API, read the docs o
 - Policy refusals are *results* (`refused: true`, `reason`, `suggestion`), not errors.
   Caller errors (unknown database/table, bad arguments) are tool errors whose message
   says how to correct the call. Infrastructure failures (connection, auth) are tool errors.
-- `readOnlyHint=True` on every tool.
+- `read_only_hint=True` (wire: `readOnlyHint`) on every tool.
 - Tools are registered statically. Unsupported-on-this-server returns
   `{"supported": false, "reason": ..., "requires": [...]}`.
 - Tool descriptions are written for an LLM caller: what it returns, when to use it,
@@ -61,8 +61,9 @@ the standalone `fastmcp` package. If you are unsure of a v2 API, read the docs o
 MCP SDK v2 (mcp 2.3.0):
 - `from mcp.server import MCPServer`; `ToolError` from `mcp.server.mcpserver.exceptions`.
 - Pydantic models are snake_case at runtime: `tool.annotations.read_only_hint`,
-  `tool.output_schema`, `result.structured_content`, `result.is_error`. camelCase
-  (`readOnlyHint=`) only works as a constructor alias.
+  `tool.output_schema`, `result.structured_content`, `result.is_error`. Construct them
+  with snake_case too (`ToolAnnotations(read_only_hint=True)`; `populate_by_name=True`);
+  the wire form is still camelCase (`readOnlyHint`).
 - Sync `def` tools run on worker threads (right for the blocking connector).
 - `read_resource()` returns `Iterable[...] | InputRequiredResult`; narrow it.
 - In-process `MCPServer.call_tool()` *raises* `ToolError`; only the protocol layer turns
