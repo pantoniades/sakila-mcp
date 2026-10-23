@@ -96,11 +96,10 @@ mysql-connector-python (26.x):
 - Docker is forbidden on this machine; there is no docker-compose.yml.
 - The user installs system tooling (uv, MySQL, …) themselves; ask, don't install.
 - Integration tests run against MySQL 8.4.11 Community on a remote test server, prepared
-  with `tests/integration/setup.sql` (schemas `mysql_mcp_test`, `mysql_mcp_other`). The
-  file creates the account as `mysql_mcp_test@127.0.0.1`; for the remote server it was created
-  with the dev machine's IP address as the host. The DSN comes from `MYSQL_MCP_TEST_DSN`
-  or the gitignored `.env.test`. Never print the DSN or password; keep `CHANGE_ME` in
-  `setup.sql`.
+  with `tests/integration/setup.sql` (schemas `mysql_mcp_test`, `mysql_mcp_other`;
+  account `mysql_mcp_test@CLIENT_HOST`, here the dev machine's IP address). The DSN comes
+  from `MYSQL_MCP_TEST_DSN` or the gitignored `.env.test`. Never print the DSN or
+  password; keep the `CHANGE_ME` and `CLIENT_HOST` placeholders in `setup.sql`.
 - That server: `require_secure_transport=OFF` (TLS still negotiated), `lower_case_table_names=0`,
   `explain_json_format_version=1` by default and session-settable to 2, so both EXPLAIN
   JSON shapes are testable. No VECTOR type (the `embeddings` fixture is 9.0+ only, so its

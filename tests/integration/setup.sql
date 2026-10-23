@@ -1,6 +1,8 @@
 -- mysql_mcp integration-test fixture. Run once as an administrative account:
 --   mysql -u root -p < tests/integration/setup.sql
--- Replace CHANGE_ME below first (alphanumeric keeps the DSN free of URL escaping).
+-- Replace CHANGE_ME below first (alphanumeric keeps the DSN free of URL escaping), and
+-- CLIENT_HOST with the address the server sees the test client connect from
+-- (127.0.0.1 for a local server).
 -- Teardown is at the bottom, commented out.
 
 CREATE DATABASE IF NOT EXISTS mysql_mcp_test
@@ -91,16 +93,16 @@ CREATE TABLE secret (
 
 INSERT INTO secret VALUES (1, 'must not be readable through the server');
 
--- Test account: TCP to 127.0.0.1, caching_sha2_password, grants as recommended for
+-- Test account: TCP from CLIENT_HOST, caching_sha2_password, grants as recommended for
 -- production plus the single INSERT grant explained above.
-CREATE USER IF NOT EXISTS 'mysql_mcp_test'@'127.0.0.1'
+CREATE USER IF NOT EXISTS 'mysql_mcp_test'@'CLIENT_HOST'
   IDENTIFIED WITH caching_sha2_password BY 'CHANGE_ME';
-GRANT SELECT, SHOW VIEW ON mysql_mcp_test.*  TO 'mysql_mcp_test'@'127.0.0.1';
-GRANT SELECT, SHOW VIEW ON mysql_mcp_other.* TO 'mysql_mcp_test'@'127.0.0.1';
-GRANT PROCESS, REPLICATION CLIENT ON *.*     TO 'mysql_mcp_test'@'127.0.0.1';
-GRANT INSERT ON mysql_mcp_test.write_probe   TO 'mysql_mcp_test'@'127.0.0.1';
+GRANT SELECT, SHOW VIEW ON mysql_mcp_test.*  TO 'mysql_mcp_test'@'CLIENT_HOST';
+GRANT SELECT, SHOW VIEW ON mysql_mcp_other.* TO 'mysql_mcp_test'@'CLIENT_HOST';
+GRANT PROCESS, REPLICATION CLIENT ON *.*     TO 'mysql_mcp_test'@'CLIENT_HOST';
+GRANT INSERT ON mysql_mcp_test.write_probe   TO 'mysql_mcp_test'@'CLIENT_HOST';
 
 -- Teardown:
--- DROP USER IF EXISTS 'mysql_mcp_test'@'127.0.0.1';
+-- DROP USER IF EXISTS 'mysql_mcp_test'@'CLIENT_HOST';
 -- DROP DATABASE IF EXISTS mysql_mcp_test;
 -- DROP DATABASE IF EXISTS mysql_mcp_other;
