@@ -105,6 +105,7 @@ mysql-connector-python (26.x):
   JSON shapes are testable. No VECTOR type (the `embeddings` fixture is 9.0+ only, so its
   tests skip). The test account cannot see `sys` or read `performance_schema` unless granted.
 - No 9.x server is available to the tests at present.
+- Host-specific details (server names, addresses) live in the gitignored `CLAUDE.local.md`.
 
 ## Working style
 - Propose, then wait for OK, before any structural change.
