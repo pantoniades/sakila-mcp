@@ -3,7 +3,8 @@
 from typing import Any
 
 import pytest
-from mcp.types import CallToolResult
+from mcp.client import Client
+from mcp.types import CallToolResult, TextContent
 
 from sakila_mcp.config import Config
 from sakila_mcp.pool import Database
@@ -27,6 +28,19 @@ async def _call(
         inner: dict[str, Any] = content["result"]
         return inner
     return content
+
+
+async def _call_error(database: Database, config: Config, tool: str, args: dict[str, Any]) -> str:
+    """Call a tool expected to fail with a tool error; return the error text.
+
+    Goes through an in-memory client: in-process ``MCPServer.call_tool`` raises
+    ``ToolError``, and only the protocol layer turns it into ``isError: true``.
+    """
+    async with Client(build_server(config, database)) as client:
+        result = await client.call_tool(tool, args)
+    assert result.is_error
+    assert result.structured_content is None
+    return "".join(c.text for c in result.content if isinstance(c, TextContent))
 
 
 async def test_list_databases_applies_allowlist(database: Database, config: Config) -> None:
@@ -76,9 +90,9 @@ async def test_list_tables_refuses_non_allowlisted(database: Database, config: C
 async def test_list_tables_missing_database(database: Database, config: Config) -> None:
     missing = "sakila_mcp_missing"
     wider = config.model_copy(update={"database_allowlist": [TEST_DB, missing]})
-    result = await _call(database, wider, "list_tables", {"database": missing})
-    assert result["refused"] is True
-    assert result["code"] == "database_not_found"
+    message = await _call_error(database, wider, "list_tables", {"database": missing})
+    assert "does not exist" in message
+    assert "list_databases" in message
 
 
 async def test_describe_customer(database: Database, config: Config) -> None:
@@ -152,11 +166,11 @@ async def test_describe_view(database: Database, config: Config) -> None:
 
 
 async def test_describe_missing_table(database: Database, config: Config) -> None:
-    result = await _call(
+    message = await _call_error(
         database, config, "describe_table", {"database": TEST_DB, "table": "no_such_table"}
     )
-    assert result["refused"] is True
-    assert result["code"] == "table_not_found"
+    assert f"{TEST_DB}.no_such_table does not exist" in message
+    assert "list_tables" in message
 
 
 async def test_describe_refuses_non_allowlisted(database: Database, config: Config) -> None:

@@ -61,19 +61,18 @@ TableName = Annotated[
 ]
 
 
-def _database_not_found(database: str) -> Refusal:
-    return Refusal(
-        code="database_not_found",
-        reason=f"Database {database!r} does not exist or is not visible to this account.",
-        suggestion="Call list_databases to see which databases you can query.",
+# Unknown objects are caller errors (a tool error the caller can correct), not refusals.
+def _database_not_found(database: str) -> ToolError:
+    return ToolError(
+        f"Database {database!r} does not exist or is not visible to this account. "
+        "Call list_databases to see which databases you can query."
     )
 
 
-def _table_not_found(database: str, table: str) -> Refusal:
-    return Refusal(
-        code="table_not_found",
-        reason=f"Table {database}.{table} does not exist or is not visible to this account.",
-        suggestion=f"Call list_tables with database={database!r} to see its tables.",
+def _table_not_found(database: str, table: str) -> ToolError:
+    return ToolError(
+        f"Table {database}.{table} does not exist or is not visible to this account. "
+        f"Call list_tables with database={database!r} to see its tables."
     )
 
 
@@ -162,7 +161,7 @@ def build_server(config: Config, database: Database) -> MCPServer:
             tables = catalog.list_tables(cursor, database) if exists else []
             cursor.close()
         if not exists:
-            return _database_not_found(database)
+            raise _database_not_found(database)
         return TableList(database=database, tables=tables)
 
     @server.tool(
@@ -179,7 +178,9 @@ def build_server(config: Config, database: Database) -> MCPServer:
             cursor = cnx.cursor()
             description = catalog.describe_table(cursor, database, table)
             cursor.close()
-        return description if description is not None else _table_not_found(database, table)
+        if description is None:
+            raise _table_not_found(database, table)
+        return description
 
     @server.resource(
         CAPABILITIES_URI,

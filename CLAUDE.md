@@ -37,7 +37,8 @@ the standalone `fastmcp` package. If you are unsure of a v2 API, read the docs o
 ## MCP conventions
 - Pydantic models for all tool inputs and outputs; structured results, not prose.
 - Policy refusals are *results* (`refused: true`, `reason`, `suggestion`), not errors.
-  Infrastructure failures (connection, auth) are tool errors.
+  Caller errors (unknown database/table, bad arguments) are tool errors whose message
+  says how to correct the call. Infrastructure failures (connection, auth) are tool errors.
 - `readOnlyHint=True` on every tool.
 - Tools are registered statically. Unsupported-on-this-server returns
   `{"supported": false, "reason": ..., "requires": [...]}`.
@@ -64,6 +65,10 @@ MCP SDK v2 (mcp 2.3.0):
   (`readOnlyHint=`) only works as a constructor alias.
 - Sync `def` tools run on worker threads (right for the blocking connector).
 - `read_resource()` returns `Iterable[...] | InputRequiredResult`; narrow it.
+- In-process `MCPServer.call_tool()` *raises* `ToolError`; only the protocol layer turns
+  it into `isError: true` (text prefixed `Error executing tool <name>: `, no structured
+  content). Test error paths through `mcp.client.Client(server)` (in-memory).
+- A tool returning `Model | Refusal` gets an output schema wrapped as `{"result": ...}`.
 - The stdio server exits on stdin EOF and abandons in-flight requests. Tests must keep
   stdin open until the response arrives.
 - No async lifespan: `main()` opens `Database` before `run("stdio")` and passes it to
