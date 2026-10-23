@@ -1,7 +1,9 @@
 # Kickoff prompt — mysql_mcp v0.1 (paste into the first Claude Code session)
 
-> **Historical.** This is the original v0.1 spec. Where it conflicts with `CLAUDE.md`
-> (Docker, docker-compose, the MySQL 8.4 container, the test server), `CLAUDE.md` wins.
+> **Historical.** This is the original v0.1 spec, written when the project was called
+> mysql-mcp (package `mysql_mcp`, env `MYSQL_MCP_*`); it is now sakila-mcp. Where it
+> conflicts with `CLAUDE.md` (Docker, docker-compose, the MySQL 8.4 container, the test
+> server), `CLAUDE.md` wins.
 
 Read CLAUDE.md first and follow it. This session builds **v0.1, an MVP**. Resist scope
 creep: everything under "Not in v0.1" is deferred on purpose, and a smaller correct

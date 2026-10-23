@@ -2,10 +2,10 @@
 
 from dataclasses import dataclass
 
-from mysql_mcp.config import Config
-from mysql_mcp.models.common import Refusal
-from mysql_mcp.safety.allowlist import check_access
-from mysql_mcp.safety.classifier import Classification, classify
+from sakila_mcp.config import Config
+from sakila_mcp.models.common import Refusal
+from sakila_mcp.safety.allowlist import check_access
+from sakila_mcp.safety.classifier import Classification, classify
 
 
 @dataclass(frozen=True)

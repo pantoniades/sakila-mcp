@@ -4,18 +4,18 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from mysql_mcp.config import Config, load_config
+from sakila_mcp.config import Config, load_config
 
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in list(os.environ):
-        if key.startswith("MYSQL_MCP_"):
+        if key.startswith("SAKILA_MCP_"):
             monkeypatch.delenv(key)
 
 
 def test_defaults_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MYSQL_MCP_USER", "mcp")
+    monkeypatch.setenv("SAKILA_MCP_USER", "mcp")
     config = load_config()
     assert config.user == "mcp"
     assert config.host == "127.0.0.1"
@@ -34,14 +34,14 @@ def test_user_required() -> None:
 
 
 def test_allowlist_env_comma_separated(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MYSQL_MCP_USER", "mcp")
-    monkeypatch.setenv("MYSQL_MCP_DATABASE_ALLOWLIST", "sakila, world ,,")
+    monkeypatch.setenv("SAKILA_MCP_USER", "mcp")
+    monkeypatch.setenv("SAKILA_MCP_DATABASE_ALLOWLIST", "sakila, world ,,")
     assert load_config().database_allowlist == ["sakila", "world"]
 
 
 def test_password_is_secret(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MYSQL_MCP_USER", "mcp")
-    monkeypatch.setenv("MYSQL_MCP_PASSWORD", "hunter2-secret")
+    monkeypatch.setenv("SAKILA_MCP_USER", "mcp")
+    monkeypatch.setenv("SAKILA_MCP_PASSWORD", "hunter2-secret")
     config = load_config()
     assert config.password.get_secret_value() == "hunter2-secret"
     assert "hunter2-secret" not in repr(config)
@@ -49,8 +49,8 @@ def test_password_is_secret(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_read_only_false_refused(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MYSQL_MCP_USER", "mcp")
-    monkeypatch.setenv("MYSQL_MCP_READ_ONLY", "false")
+    monkeypatch.setenv("SAKILA_MCP_USER", "mcp")
+    monkeypatch.setenv("SAKILA_MCP_READ_ONLY", "false")
     with pytest.raises(ValidationError, match="write mode is not implemented"):
         load_config()
 
@@ -70,7 +70,7 @@ def test_toml_file(tmp_path: Path) -> None:
 def test_env_overrides_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "mcp.toml"
     path.write_text('user = "reader"\nmax_rows = 50\n', encoding="utf-8")
-    monkeypatch.setenv("MYSQL_MCP_MAX_ROWS", "75")
+    monkeypatch.setenv("SAKILA_MCP_MAX_ROWS", "75")
     assert load_config(path).max_rows == 75
 
 
@@ -90,7 +90,7 @@ def test_toml_missing_file(tmp_path: Path) -> None:
     ("key", "value"), [("max_rows", "0"), ("port", "70000"), ("pool_size", "0")]
 )
 def test_bounds(monkeypatch: pytest.MonkeyPatch, key: str, value: str) -> None:
-    monkeypatch.setenv("MYSQL_MCP_USER", "mcp")
-    monkeypatch.setenv(f"MYSQL_MCP_{key.upper()}", value)
+    monkeypatch.setenv("SAKILA_MCP_USER", "mcp")
+    monkeypatch.setenv(f"SAKILA_MCP_{key.upper()}", value)
     with pytest.raises(ValidationError):
         load_config()

@@ -9,10 +9,10 @@ from typing import Any
 import mysql.connector
 from mysql.connector.connection import MySQLConnection
 
-from mysql_mcp import __version__
-from mysql_mcp.capabilities import Capabilities, probe
-from mysql_mcp.config import Config
-from mysql_mcp.safety.redact import redact
+from sakila_mcp import __version__
+from sakila_mcp.capabilities import Capabilities, probe
+from sakila_mcp.config import Config
+from sakila_mcp.safety.redact import redact
 
 log = logging.getLogger(__name__)
 
@@ -41,25 +41,25 @@ def connect_args(config: Config) -> dict[str, Any]:
         "autocommit": True,
         "charset": "utf8mb4",
         "connection_timeout": CONNECT_TIMEOUT_S,
-        "conn_attrs": {"program_name": "mysql-mcp", "mysql_mcp_version": __version__},
+        "conn_attrs": {"program_name": "sakila-mcp", "sakila_mcp_version": __version__},
     }
 
 
 def init_session(cursor: Any, statement_timeout_ms: int) -> None:
     """Make the session read-only and bounded. Raises DatabaseError if it cannot."""
-    cursor.execute("/* mysql-mcp init */ SET SESSION TRANSACTION READ ONLY")
+    cursor.execute("/* sakila-mcp init */ SET SESSION TRANSACTION READ ONLY")
     cursor.execute(
-        "/* mysql-mcp init */ SET SESSION max_execution_time = %s, SESSION lock_wait_timeout = %s",
+        "/* sakila-mcp init */ SET SESSION max_execution_time = %s, SESSION lock_wait_timeout = %s",
         (statement_timeout_ms, LOCK_WAIT_TIMEOUT_S),
     )
-    cursor.execute("/* mysql-mcp init */ SELECT @@SESSION.sql_mode")
+    cursor.execute("/* sakila-mcp init */ SELECT @@SESSION.sql_mode")
     (mode,) = cursor.fetchone()
     flags = [f for f in str(mode).split(",") if f]
     kept = [f for f in flags if f.upper() not in STRIPPED_SQL_MODES]
     if kept == flags:
         return
-    cursor.execute("/* mysql-mcp init */ SET SESSION sql_mode = %s", (",".join(kept),))
-    cursor.execute("/* mysql-mcp init */ SELECT @@SESSION.sql_mode")
+    cursor.execute("/* sakila-mcp init */ SET SESSION sql_mode = %s", (",".join(kept),))
+    cursor.execute("/* sakila-mcp init */ SELECT @@SESSION.sql_mode")
     (mode,) = cursor.fetchone()
     if STRIPPED_SQL_MODES & {f.upper() for f in str(mode).split(",")}:
         raise DatabaseError(f"could not clear lexing-related sql_mode flags (got {mode})")

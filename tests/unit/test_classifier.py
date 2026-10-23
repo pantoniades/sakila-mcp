@@ -2,8 +2,8 @@
 
 import pytest
 
-from mysql_mcp.models.common import Refusal
-from mysql_mcp.safety.classifier import Classification, Kind, TableRef, classify
+from sakila_mcp.models.common import Refusal
+from sakila_mcp.safety.classifier import Classification, Kind, TableRef, classify
 
 
 def _accepted(sql: str) -> Classification:

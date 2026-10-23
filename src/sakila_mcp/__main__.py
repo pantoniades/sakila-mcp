@@ -1,4 +1,4 @@
-"""Entry point: ``python -m mysql_mcp [--config path.toml]`` serves MCP over stdio."""
+"""Entry point: ``python -m sakila_mcp [--config path.toml]`` serves MCP over stdio."""
 
 import argparse
 import logging
@@ -8,13 +8,13 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from mysql_mcp import __version__
-from mysql_mcp.config import Config, load_config
-from mysql_mcp.pool import Database, DatabaseError
-from mysql_mcp.safety.redact import RedactingFilter, redact_exception, register_secret
-from mysql_mcp.server import build_server
+from sakila_mcp import __version__
+from sakila_mcp.config import Config, load_config
+from sakila_mcp.pool import Database, DatabaseError
+from sakila_mcp.safety.redact import RedactingFilter, redact_exception, register_secret
+from sakila_mcp.server import build_server
 
-log = logging.getLogger("mysql_mcp")
+log = logging.getLogger("sakila_mcp")
 
 
 def _configure_logging() -> None:
@@ -33,9 +33,9 @@ def _configure_logging() -> None:
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="mysql-mcp",
+        prog="sakila-mcp",
         description="Read-only MySQL MCP server (stdio transport). "
-        "Configure with MYSQL_MCP_* environment variables and/or a TOML file.",
+        "Configure with SAKILA_MCP_* environment variables and/or a TOML file.",
     )
     parser.add_argument("--config", type=Path, metavar="PATH", help="optional TOML config file")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -69,7 +69,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         log.error("%s", exc)
         raise SystemExit(1) from None
     server = build_server(config, database)
-    log.info("mysql-mcp %s starting on stdio", __version__)
+    log.info("sakila-mcp %s starting on stdio", __version__)
     try:
         server.run("stdio")
     finally:

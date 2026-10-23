@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from mysql_mcp.config import Config
-from mysql_mcp.pool import Database
-from mysql_mcp.server import CAPABILITIES_URI, SERVER_NAME, build_server
+from sakila_mcp.config import Config
+from sakila_mcp.pool import Database
+from sakila_mcp.server import CAPABILITIES_URI, SERVER_NAME, build_server
 
 
 @pytest.mark.anyio
@@ -38,7 +38,7 @@ async def test_capabilities_resource_registered() -> None:
 
 def test_help_runs() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "mysql_mcp", "--help"],
+        [sys.executable, "-m", "sakila_mcp", "--help"],
         capture_output=True,
         text=True,
         check=False,
@@ -51,7 +51,7 @@ def test_bad_config_never_echoes_input(tmp_path: Path) -> None:
     path = tmp_path / "bad.toml"
     path.write_text('user = "u"\npasword = "leaky-value"\n', encoding="utf-8")
     result = subprocess.run(
-        [sys.executable, "-m", "mysql_mcp", "--config", str(path)],
+        [sys.executable, "-m", "sakila_mcp", "--config", str(path)],
         capture_output=True,
         text=True,
         check=False,

@@ -24,8 +24,8 @@ from sqlglot import exp
 from sqlglot.errors import SqlglotError
 from sqlglot.tokenizer_core import Token, TokenType
 
-from mysql_mcp.models.common import Refusal
-from mysql_mcp.safety.builtins import BUILTIN_FUNCTIONS, DENIED_FUNCTIONS, PAREN_KEYWORDS
+from sakila_mcp.models.common import Refusal
+from sakila_mcp.safety.builtins import BUILTIN_FUNCTIONS, DENIED_FUNCTIONS, PAREN_KEYWORDS
 
 
 class Kind(StrEnum):

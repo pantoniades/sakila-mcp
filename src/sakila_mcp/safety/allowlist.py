@@ -7,8 +7,8 @@ result is never more permissive than the server's ``lower_case_table_names`` set
 
 from collections.abc import Iterable, Sequence
 
-from mysql_mcp.models.common import Refusal
-from mysql_mcp.safety.classifier import TableRef
+from sakila_mcp.models.common import Refusal
+from sakila_mcp.safety.classifier import TableRef
 
 SYSTEM_SCHEMAS = frozenset({"information_schema", "performance_schema", "sys"})
 DENIED_BY_DEFAULT = "mysql"

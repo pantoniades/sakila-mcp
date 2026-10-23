@@ -1,17 +1,17 @@
--- mysql_mcp integration-test fixture. Run once as an administrative account:
+-- sakila_mcp integration-test fixture. Run once as an administrative account:
 --   mysql -u root -p < tests/integration/setup.sql
 -- Replace CHANGE_ME below first (alphanumeric keeps the DSN free of URL escaping), and
 -- CLIENT_HOST with the address the server sees the test client connect from
 -- (127.0.0.1 for a local server).
 -- Teardown is at the bottom, commented out.
 
-CREATE DATABASE IF NOT EXISTS mysql_mcp_test
+CREATE DATABASE IF NOT EXISTS sakila_mcp_test
   CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 -- Second schema that the tests leave OUT of the allowlist.
-CREATE DATABASE IF NOT EXISTS mysql_mcp_other
+CREATE DATABASE IF NOT EXISTS sakila_mcp_other
   CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 
-USE mysql_mcp_test;
+USE sakila_mcp_test;
 
 CREATE TABLE numbers (
   n INT UNSIGNED NOT NULL PRIMARY KEY
@@ -84,7 +84,7 @@ INSERT INTO blobs (id, payload, raw_bin, big_text) VALUES
   (1, STRING_TO_VECTOR('[1.0, 2.0, 3.0]')),
   (2, STRING_TO_VECTOR('[0.5, 0.25, 0.125]')) */;
 
-USE mysql_mcp_other;
+USE sakila_mcp_other;
 
 CREATE TABLE secret (
   id  INT NOT NULL PRIMARY KEY,
@@ -95,14 +95,14 @@ INSERT INTO secret VALUES (1, 'must not be readable through the server');
 
 -- Test account: TCP from CLIENT_HOST, caching_sha2_password, grants as recommended for
 -- production plus the single INSERT grant explained above.
-CREATE USER IF NOT EXISTS 'mysql_mcp_test'@'CLIENT_HOST'
+CREATE USER IF NOT EXISTS 'sakila_mcp_test'@'CLIENT_HOST'
   IDENTIFIED WITH caching_sha2_password BY 'CHANGE_ME';
-GRANT SELECT, SHOW VIEW ON mysql_mcp_test.*  TO 'mysql_mcp_test'@'CLIENT_HOST';
-GRANT SELECT, SHOW VIEW ON mysql_mcp_other.* TO 'mysql_mcp_test'@'CLIENT_HOST';
-GRANT PROCESS, REPLICATION CLIENT ON *.*     TO 'mysql_mcp_test'@'CLIENT_HOST';
-GRANT INSERT ON mysql_mcp_test.write_probe   TO 'mysql_mcp_test'@'CLIENT_HOST';
+GRANT SELECT, SHOW VIEW ON sakila_mcp_test.*  TO 'sakila_mcp_test'@'CLIENT_HOST';
+GRANT SELECT, SHOW VIEW ON sakila_mcp_other.* TO 'sakila_mcp_test'@'CLIENT_HOST';
+GRANT PROCESS, REPLICATION CLIENT ON *.*     TO 'sakila_mcp_test'@'CLIENT_HOST';
+GRANT INSERT ON sakila_mcp_test.write_probe   TO 'sakila_mcp_test'@'CLIENT_HOST';
 
 -- Teardown:
--- DROP USER IF EXISTS 'mysql_mcp_test'@'CLIENT_HOST';
--- DROP DATABASE IF EXISTS mysql_mcp_test;
--- DROP DATABASE IF EXISTS mysql_mcp_other;
+-- DROP USER IF EXISTS 'sakila_mcp_test'@'CLIENT_HOST';
+-- DROP DATABASE IF EXISTS sakila_mcp_test;
+-- DROP DATABASE IF EXISTS sakila_mcp_other;

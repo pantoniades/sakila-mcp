@@ -1,6 +1,6 @@
 import pytest
 
-from mysql_mcp.catalog import key_part, text
+from sakila_mcp.catalog import key_part, text
 
 
 @pytest.mark.parametrize(

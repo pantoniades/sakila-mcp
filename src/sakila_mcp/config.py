@@ -1,4 +1,4 @@
-"""Server configuration from ``MYSQL_MCP_*`` env vars and an optional TOML file.
+"""Server configuration from ``SAKILA_MCP_*`` env vars and an optional TOML file.
 
 Precedence (highest first): explicit init kwargs, environment, TOML file, defaults.
 """
@@ -18,7 +18,7 @@ from pydantic_settings import (
 
 class Config(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="MYSQL_MCP_",
+        env_prefix="SAKILA_MCP_",
         extra="forbid",
         toml_file=None,
     )
@@ -47,7 +47,7 @@ class Config(BaseSettings):
     def _require_read_only(cls, value: bool) -> bool:
         if not value:
             raise ValueError(
-                "write mode is not implemented in mysql-mcp v0.1; read_only must be true"
+                "write mode is not implemented in sakila-mcp v0.1; read_only must be true"
             )
         return value
 

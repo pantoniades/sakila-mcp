@@ -5,16 +5,16 @@ from typing import Any
 import mysql.connector
 import pytest
 
-from mysql_mcp import __version__
-from mysql_mcp.config import Config
-from mysql_mcp.pool import (
+from sakila_mcp import __version__
+from sakila_mcp.config import Config
+from sakila_mcp.pool import (
     LOCK_WAIT_TIMEOUT_S,
     DatabaseError,
     connect_args,
     describe_connect_error,
     init_session,
 )
-from mysql_mcp.safety.redact import clear_secrets, register_secret
+from sakila_mcp.safety.redact import clear_secrets, register_secret
 
 PASSWORD = "pw-Zq81-secret"
 
@@ -71,7 +71,7 @@ def test_init_session_strips_lexing_modes(mode: str, expected: str) -> None:
     cursor = FakeCursor([mode, expected])
     init_session(cursor, 1000)
     set_mode = [(sql, p) for sql, p in cursor.executed if "SET SESSION sql_mode" in sql]
-    assert set_mode == [("/* mysql-mcp init */ SET SESSION sql_mode = %s", (expected,))]
+    assert set_mode == [("/* sakila-mcp init */ SET SESSION sql_mode = %s", (expected,))]
 
 
 def test_init_session_fails_closed_if_mode_sticks() -> None:
@@ -82,7 +82,7 @@ def test_init_session_fails_closed_if_mode_sticks() -> None:
 
 def test_connect_args() -> None:
     args = connect_args(Config(user="mcp", password=PASSWORD, host="db", port=3307))
-    assert args["conn_attrs"] == {"program_name": "mysql-mcp", "mysql_mcp_version": __version__}
+    assert args["conn_attrs"] == {"program_name": "sakila-mcp", "sakila_mcp_version": __version__}
     assert args["autocommit"] is True
     assert (args["host"], args["port"], args["user"]) == ("db", 3307, "mcp")
 

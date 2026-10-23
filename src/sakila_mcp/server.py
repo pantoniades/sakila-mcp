@@ -12,18 +12,18 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from mysql_mcp import __version__, catalog
-from mysql_mcp.catalog import text as _text
-from mysql_mcp.config import Config
-from mysql_mcp.models.catalog import DatabaseList, TableDescription, TableList
-from mysql_mcp.models.common import Refusal
-from mysql_mcp.models.server import ServerInfo
-from mysql_mcp.pool import Database, DatabaseError
-from mysql_mcp.safety.allowlist import check_access
-from mysql_mcp.safety.classifier import TableRef
-from mysql_mcp.safety.redact import redact
+from sakila_mcp import __version__, catalog
+from sakila_mcp.catalog import text as _text
+from sakila_mcp.config import Config
+from sakila_mcp.models.catalog import DatabaseList, TableDescription, TableList
+from sakila_mcp.models.common import Refusal
+from sakila_mcp.models.server import ServerInfo
+from sakila_mcp.pool import Database, DatabaseError
+from sakila_mcp.safety.allowlist import check_access
+from sakila_mcp.safety.classifier import TableRef
+from sakila_mcp.safety.redact import redact
 
-SERVER_NAME = "mysql-mcp"
+SERVER_NAME = "sakila-mcp"
 CAPABILITIES_URI = "mysql://capabilities"
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
@@ -108,12 +108,12 @@ def build_server(config: Config, database: Database) -> MCPServer:
             cursor = cnx.cursor()
             placeholders = ", ".join(["%s"] * len(_SERVER_INFO_VARIABLES))
             cursor.execute(
-                "/* mysql-mcp tool=server_info */ SHOW GLOBAL VARIABLES "
+                "/* sakila-mcp tool=server_info */ SHOW GLOBAL VARIABLES "
                 f"WHERE Variable_name IN ({placeholders})",
                 _SERVER_INFO_VARIABLES,
             )
             values = {_text(name).lower(): _text(value) for name, value in cursor.fetchall()}
-            cursor.execute("/* mysql-mcp tool=server_info */ SHOW GLOBAL STATUS LIKE 'Uptime'")
+            cursor.execute("/* sakila-mcp tool=server_info */ SHOW GLOBAL STATUS LIKE 'Uptime'")
             row = cursor.fetchone()
             cursor.close()
         return ServerInfo(

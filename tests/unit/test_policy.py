@@ -1,10 +1,10 @@
 import pytest
 
-from mysql_mcp.config import Config
-from mysql_mcp.models.common import Refusal
-from mysql_mcp.safety.allowlist import filter_databases, is_database_allowed
-from mysql_mcp.safety.classifier import Kind
-from mysql_mcp.safety.policy import Allowed, evaluate
+from sakila_mcp.config import Config
+from sakila_mcp.models.common import Refusal
+from sakila_mcp.safety.allowlist import filter_databases, is_database_allowed
+from sakila_mcp.safety.classifier import Kind
+from sakila_mcp.safety.policy import Allowed, evaluate
 
 
 def _config(allowlist: list[str] | None = None, timeout_ms: int = 10_000) -> Config:

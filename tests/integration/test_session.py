@@ -12,10 +12,10 @@ import pytest
 from mcp.types import CallToolResult, InputRequiredResult
 from mysql.connector.connection import MySQLConnection
 
-from mysql_mcp.config import Config
-from mysql_mcp.pool import STRIPPED_SQL_MODES, Database, DatabaseError
-from mysql_mcp.server import CAPABILITIES_URI, build_server
-from mysql_mcp.versions import parse_version, release_line
+from sakila_mcp.config import Config
+from sakila_mcp.pool import STRIPPED_SQL_MODES, Database, DatabaseError
+from sakila_mcp.server import CAPABILITIES_URI, build_server
+from sakila_mcp.versions import parse_version, release_line
 
 from .conftest import TEST_DB, Dsn
 
@@ -45,7 +45,7 @@ def test_insert_refused_by_read_only_session(database: Database) -> None:
     with database.connection() as cnx:
         cursor = cnx.cursor()
         with pytest.raises(mysql.connector.Error) as info:
-            cursor.execute("INSERT INTO mysql_mcp_test.write_probe (id) VALUES (1)")
+            cursor.execute("INSERT INTO sakila_mcp_test.write_probe (id) VALUES (1)")
         cursor.close()
     assert info.value.errno == 1792
 
@@ -92,8 +92,8 @@ def test_connection_attributes(database: Database) -> None:
             raise
         attrs: dict[Any, Any] = dict(cursor.fetchall())  # type: ignore[arg-type]
         cursor.close()
-    assert attrs.get("program_name") == "mysql-mcp"
-    assert "mysql_mcp_version" in attrs
+    assert attrs.get("program_name") == "sakila-mcp"
+    assert "sakila_mcp_version" in attrs
 
 
 def test_auth_failure_names_plugin(dsn: Dsn, config: Config) -> None:
@@ -190,16 +190,16 @@ def test_stdio_end_to_end(dsn: Dsn) -> None:
     ]
     env = {
         **os.environ,
-        "MYSQL_MCP_HOST": dsn.host,
-        "MYSQL_MCP_PORT": str(dsn.port),
-        "MYSQL_MCP_USER": dsn.user,
-        "MYSQL_MCP_PASSWORD": dsn.password,
-        "MYSQL_MCP_DATABASE_ALLOWLIST": TEST_DB,
+        "SAKILA_MCP_HOST": dsn.host,
+        "SAKILA_MCP_PORT": str(dsn.port),
+        "SAKILA_MCP_USER": dsn.user,
+        "SAKILA_MCP_PASSWORD": dsn.password,
+        "SAKILA_MCP_DATABASE_ALLOWLIST": TEST_DB,
     }
     # Keep stdin open until the response arrives: a real client does, and the server
     # exits on EOF without finishing in-flight requests.
     proc = subprocess.Popen(
-        [sys.executable, "-m", "mysql_mcp"],
+        [sys.executable, "-m", "sakila_mcp"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

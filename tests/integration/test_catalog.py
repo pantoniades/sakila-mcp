@@ -5,9 +5,9 @@ from typing import Any
 import pytest
 from mcp.types import CallToolResult
 
-from mysql_mcp.config import Config
-from mysql_mcp.pool import Database
-from mysql_mcp.server import build_server
+from sakila_mcp.config import Config
+from sakila_mcp.pool import Database
+from sakila_mcp.server import build_server
 
 from .conftest import OTHER_DB, TEST_DB
 
@@ -74,7 +74,7 @@ async def test_list_tables_refuses_non_allowlisted(database: Database, config: C
 
 
 async def test_list_tables_missing_database(database: Database, config: Config) -> None:
-    missing = "mysql_mcp_missing"
+    missing = "sakila_mcp_missing"
     wider = config.model_copy(update={"database_allowlist": [TEST_DB, missing]})
     result = await _call(database, wider, "list_tables", {"database": missing})
     assert result["refused"] is True

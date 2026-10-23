@@ -1,4 +1,4 @@
-"""Integration fixtures. Requires MYSQL_MCP_TEST_DSN (env, or a gitignored .env.test).
+"""Integration fixtures. Requires SAKILA_MCP_TEST_DSN (env, or a gitignored .env.test).
 
 The target server must have been prepared with tests/integration/setup.sql.
 """
@@ -11,13 +11,13 @@ from urllib.parse import unquote, urlsplit
 
 import pytest
 
-from mysql_mcp.config import Config
-from mysql_mcp.pool import Database
-from mysql_mcp.safety.redact import register_secret
+from sakila_mcp.config import Config
+from sakila_mcp.pool import Database
+from sakila_mcp.safety.redact import register_secret
 
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env.test"
-TEST_DB = "mysql_mcp_test"
-OTHER_DB = "mysql_mcp_other"
+TEST_DB = "sakila_mcp_test"
+OTHER_DB = "sakila_mcp_other"
 
 
 @dataclass(frozen=True)
@@ -29,13 +29,13 @@ class Dsn:
 
 
 def _read_dsn() -> str | None:
-    value = os.environ.get("MYSQL_MCP_TEST_DSN")
+    value = os.environ.get("SAKILA_MCP_TEST_DSN")
     if value:
         return value
     if ENV_FILE.is_file():
         for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
             key, sep, rest = line.partition("=")
-            if sep and key.strip() == "MYSQL_MCP_TEST_DSN":
+            if sep and key.strip() == "SAKILA_MCP_TEST_DSN":
                 return rest.strip()
     return None
 
@@ -44,7 +44,7 @@ def _read_dsn() -> str | None:
 def dsn() -> Dsn:
     raw = _read_dsn()
     if not raw:
-        pytest.skip("MYSQL_MCP_TEST_DSN not set (env or .env.test)")
+        pytest.skip("SAKILA_MCP_TEST_DSN not set (env or .env.test)")
     parts = urlsplit(raw)
     password = unquote(parts.password or "")
     register_secret(password)

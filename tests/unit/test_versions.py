@@ -1,6 +1,6 @@
 import pytest
 
-from mysql_mcp.versions import parse_version, release_line
+from sakila_mcp.versions import parse_version, release_line
 
 
 @pytest.mark.parametrize(

@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from mysql_mcp.models.catalog import (
+from sakila_mcp.models.catalog import (
     Column,
     DatabaseEntry,
     DatabaseList,
@@ -13,7 +13,7 @@ from mysql_mcp.models.catalog import (
     TableDescription,
     TableSummary,
 )
-from mysql_mcp.safety.allowlist import SYSTEM_SCHEMAS, filter_databases
+from sakila_mcp.safety.allowlist import SYSTEM_SCHEMAS, filter_databases
 
 
 def text(value: object) -> str:
@@ -31,7 +31,7 @@ def _opt_int(value: object) -> int | None:
 
 def list_databases(cursor: Any, allowlist: Sequence[str]) -> DatabaseList:
     cursor.execute(
-        "/* mysql-mcp tool=list_databases */ "
+        "/* sakila-mcp tool=list_databases */ "
         "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA ORDER BY SCHEMA_NAME"
     )
     names = filter_databases((text(row[0]) for row in cursor.fetchall()), allowlist)
@@ -42,7 +42,7 @@ def list_databases(cursor: Any, allowlist: Sequence[str]) -> DatabaseList:
 
 def database_exists(cursor: Any, database: str) -> bool:
     cursor.execute(
-        "/* mysql-mcp tool=list_tables */ "
+        "/* sakila-mcp tool=list_tables */ "
         "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = %s",
         (database,),
     )
@@ -52,7 +52,7 @@ def database_exists(cursor: Any, database: str) -> bool:
 
 def list_tables(cursor: Any, database: str) -> list[TableSummary]:
     cursor.execute(
-        "/* mysql-mcp tool=list_tables */ "
+        "/* sakila-mcp tool=list_tables */ "
         "SELECT TABLE_NAME, TABLE_TYPE, ENGINE, TABLE_ROWS, DATA_LENGTH, INDEX_LENGTH, "
         "TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = %s "
         "ORDER BY TABLE_NAME",
@@ -92,7 +92,7 @@ def describe_table(cursor: Any, database: str, table: str) -> TableDescription |
     """Describe one table or view; None if it does not exist or is not visible."""
     params = (database, table)
     cursor.execute(
-        "/* mysql-mcp tool=describe_table */ "
+        "/* sakila-mcp tool=describe_table */ "
         "SELECT TABLE_NAME, TABLE_TYPE, ENGINE, ROW_FORMAT, TABLE_COLLATION, TABLE_ROWS, "
         "CREATE_TIME, TABLE_COMMENT FROM information_schema.TABLES "
         "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s",
@@ -121,7 +121,7 @@ def describe_table(cursor: Any, database: str, table: str) -> TableDescription |
 
 def _columns(cursor: Any, params: tuple[str, str]) -> list[Column]:
     cursor.execute(
-        "/* mysql-mcp tool=describe_table */ "
+        "/* sakila-mcp tool=describe_table */ "
         "SELECT COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA, COLLATION_NAME, "
         "COLUMN_COMMENT, GENERATION_EXPRESSION FROM information_schema.COLUMNS "
         "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s ORDER BY ORDINAL_POSITION",
@@ -147,7 +147,7 @@ def _columns(cursor: Any, params: tuple[str, str]) -> list[Column]:
 
 def _indexes(cursor: Any, params: tuple[str, str]) -> list[Index]:
     cursor.execute(
-        "/* mysql-mcp tool=describe_table */ "
+        "/* sakila-mcp tool=describe_table */ "
         "SELECT INDEX_NAME, NON_UNIQUE, COLUMN_NAME, SUB_PART, COLLATION, EXPRESSION, "
         "INDEX_TYPE, CARDINALITY, IS_VISIBLE FROM information_schema.STATISTICS "
         "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s "
@@ -177,7 +177,7 @@ def _indexes(cursor: Any, params: tuple[str, str]) -> list[Index]:
 
 def _foreign_keys(cursor: Any, params: tuple[str, str]) -> list[ForeignKey]:
     cursor.execute(
-        "/* mysql-mcp tool=describe_table */ "
+        "/* sakila-mcp tool=describe_table */ "
         "SELECT k.CONSTRAINT_NAME, k.COLUMN_NAME, k.REFERENCED_TABLE_SCHEMA, "
         "k.REFERENCED_TABLE_NAME, k.REFERENCED_COLUMN_NAME, r.UPDATE_RULE, r.DELETE_RULE "
         "FROM information_schema.KEY_COLUMN_USAGE k "

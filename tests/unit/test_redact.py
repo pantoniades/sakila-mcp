@@ -3,7 +3,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from mysql_mcp.safety.redact import (
+from sakila_mcp.safety.redact import (
     MASK,
     RedactingFilter,
     clear_secrets,
@@ -68,7 +68,7 @@ def test_logging_filter_redacts_message_args_and_traceback() -> None:
 
     handler = _Capture()
     handler.addFilter(RedactingFilter())
-    logger = logging.getLogger("mysql_mcp.test_redact")
+    logger = logging.getLogger("sakila_mcp.test_redact")
     logger.addHandler(handler)
     logger.propagate = False
     try:

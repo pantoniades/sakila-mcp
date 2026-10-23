@@ -1,4 +1,4 @@
-# mysql_mcp — project rules for Claude Code
+# sakila_mcp — project rules for Claude Code
 
 You are building a production-quality MySQL MCP server in Python with an experienced
 Python developer and MySQL expert (InnoDB, binlog, GTID, group replication). Do not
@@ -14,7 +14,7 @@ the standalone `fastmcp` package. If you are unsure of a v2 API, read the docs o
 `uv run python -c "import mcp; help(...)"` — do not guess from v1 memory.
 
 ## Stack
-- Python 3.12, `uv`, package `mysql_mcp`, src layout.
+- Python 3.12, `uv`, package `sakila_mcp`, src layout.
 - `mcp>=2,<3`, `mysql-connector-python`, `sqlglot`, `pydantic>=2`, `pydantic-settings`.
 - `ruff` (lint + format), `mypy --strict`, `pytest`. All three must pass before you
   say anything is done. Run them; do not claim you ran them.
@@ -96,9 +96,9 @@ mysql-connector-python (26.x):
 - Docker is forbidden on this machine; there is no docker-compose.yml.
 - The user installs system tooling (uv, MySQL, …) themselves; ask, don't install.
 - Integration tests run against MySQL 8.4.11 Community on a remote test server, prepared
-  with `tests/integration/setup.sql` (schemas `mysql_mcp_test`, `mysql_mcp_other`;
-  account `mysql_mcp_test@CLIENT_HOST`, here the dev machine's IP address). The DSN comes
-  from `MYSQL_MCP_TEST_DSN` or the gitignored `.env.test`. Never print the DSN or
+  with `tests/integration/setup.sql` (schemas `sakila_mcp_test`, `sakila_mcp_other`;
+  account `sakila_mcp_test@CLIENT_HOST`, here the dev machine's IP address). The DSN comes
+  from `SAKILA_MCP_TEST_DSN` or the gitignored `.env.test`. Never print the DSN or
   password; keep the `CHANGE_ME` and `CLIENT_HOST` placeholders in `setup.sql`.
 - That server: `require_secure_transport=OFF` (TLS still negotiated), `lower_case_table_names=0`,
   `explain_json_format_version=1` by default and session-settable to 2, so both EXPLAIN

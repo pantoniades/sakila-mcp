@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from mysql_mcp.versions import Version, parse_version, release_line
+from sakila_mcp.versions import Version, parse_version, release_line
 
 
 @dataclass(frozen=True)
@@ -19,18 +19,18 @@ class Capabilities:
 
 def probe(cursor: Any) -> Capabilities:
     """Probe capabilities with an open cursor on an initialized session."""
-    cursor.execute("/* mysql-mcp probe=capabilities */ SELECT VERSION(), @@version_comment")
+    cursor.execute("/* sakila-mcp probe=capabilities */ SELECT VERSION(), @@version_comment")
     version_raw, version_comment = cursor.fetchone()
     version = parse_version(str(version_raw))
 
     cursor.execute(
-        "/* mysql-mcp probe=capabilities */ SHOW VARIABLES LIKE 'explain_json_format_version'"
+        "/* sakila-mcp probe=capabilities */ SHOW VARIABLES LIKE 'explain_json_format_version'"
     )
     row = cursor.fetchone()
     explain_json_version = 2 if row is not None and str(row[1]) == "2" else 1
 
     cursor.execute(
-        "/* mysql-mcp probe=capabilities */ "
+        "/* sakila-mcp probe=capabilities */ "
         "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = 'sys'"
     )
     (sys_count,) = cursor.fetchone()
