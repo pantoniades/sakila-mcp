@@ -15,7 +15,12 @@ async def test_tools_registered_read_only() -> None:
     server = build_server(config, Database(config))
     assert server.name == SERVER_NAME
     tools = await server.list_tools()
-    assert [t.name for t in tools] == ["server_info"]
+    assert [t.name for t in tools] == [
+        "server_info",
+        "list_databases",
+        "list_tables",
+        "describe_table",
+    ]
     for tool in tools:
         assert tool.annotations is not None
         assert tool.annotations.read_only_hint is True
