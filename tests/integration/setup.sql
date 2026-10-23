@@ -43,10 +43,11 @@ CREATE TABLE blobs (
   big_text LONGTEXT NULL
 ) ENGINE=InnoDB;
 
-CREATE TABLE embeddings (
+-- VECTOR needs 9.0+; on older servers this table does not exist and tests skip.
+/*!90000 CREATE TABLE embeddings (
   id INT NOT NULL PRIMARY KEY,
   v  VECTOR(3) NOT NULL
-) ENGINE=InnoDB;
+) ENGINE=InnoDB */;
 
 -- The test account gets INSERT on this table only, so the read-only-session test
 -- fails with 1792 (read-only transaction) rather than a privilege error.
@@ -77,9 +78,9 @@ INSERT INTO blobs (id, payload, raw_bin, big_text) VALUES
   (1, UNHEX(REPEAT('DEADBEEF', 256)), UNHEX('00FF00FF00FF00FF'), REPEAT('x', 10000)),
   (2, NULL, NULL, 'short');
 
-INSERT INTO embeddings (id, v) VALUES
+/*!90000 INSERT INTO embeddings (id, v) VALUES
   (1, STRING_TO_VECTOR('[1.0, 2.0, 3.0]')),
-  (2, STRING_TO_VECTOR('[0.5, 0.25, 0.125]'));
+  (2, STRING_TO_VECTOR('[0.5, 0.25, 0.125]')) */;
 
 USE mysql_mcp_other;
 
