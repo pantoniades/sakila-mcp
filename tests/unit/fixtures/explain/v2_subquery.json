@@ -1,0 +1,79 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT * FROM customer WHERE id IN (SELECT customer_id FROM orders WHERE amount > 500)",
+  "explain": {
+    "query": "/* select#1 */ select `sakila_mcp_test`.`customer`.`id` AS `id`,`sakila_mcp_test`.`customer`.`email` AS `email`,`sakila_mcp_test`.`customer`.`name` AS `name`,`sakila_mcp_test`.`customer`.`created_at` AS `created_at`,`sakila_mcp_test`.`customer`.`profile` AS `profile` from `sakila_mcp_test`.`customer` semi join (`sakila_mcp_test`.`orders`) where ((`<subquery2>`.`customer_id` = `sakila_mcp_test`.`customer`.`id`) and (`sakila_mcp_test`.`orders`.`amount` > 500.00))",
+    "inputs": [
+      {
+        "operation": "Table scan on customer",
+        "table_name": "customer",
+        "access_type": "table",
+        "schema_name": "sakila_mcp_test",
+        "used_columns": [
+          "id",
+          "email",
+          "name",
+          "created_at",
+          "profile"
+        ],
+        "estimated_rows": 500.0,
+        "estimated_total_cost": 51.25
+      },
+      {
+        "inputs": [
+          {
+            "inputs": [
+              {
+                "inputs": [
+                  {
+                    "operation": "Table scan on orders",
+                    "table_name": "orders",
+                    "access_type": "table",
+                    "schema_name": "sakila_mcp_test",
+                    "used_columns": [
+                      "customer_id",
+                      "amount"
+                    ],
+                    "estimated_rows": 1000.0,
+                    "estimated_total_cost": 101.25
+                  }
+                ],
+                "condition": "(orders.amount > 500.00)",
+                "operation": "Filter: (orders.amount > 500.00)",
+                "access_type": "filter",
+                "estimated_rows": 333.29999446868896,
+                "estimated_total_cost": 101.25
+              }
+            ],
+            "operation": "Materialize with deduplication",
+            "access_type": "materialize",
+            "deduplication": true,
+            "estimated_rows": 333.29999446868896,
+            "estimated_total_cost": 134.5799994468689,
+            "estimated_first_row_cost": 134.5799994468689
+          }
+        ],
+        "covering": false,
+        "operation": "Single-row index lookup on <subquery2> using <auto_distinct_key> (customer_id=customer.id)",
+        "index_name": "<auto_distinct_key>",
+        "table_name": "<subquery2>",
+        "access_type": "index",
+        "used_columns": [
+          "customer_id"
+        ],
+        "estimated_rows": 1.0,
+        "lookup_condition": "customer_id=customer.id",
+        "index_access_type": "index_lookup",
+        "estimated_total_cost": 134.7303144808666,
+        "estimated_first_row_cost": 134.7303144808666
+      }
+    ],
+    "join_type": "inner join",
+    "operation": "Nested loop inner join",
+    "query_type": "select",
+    "access_type": "join",
+    "estimated_rows": 166649.99723434448,
+    "join_algorithm": "nested_loop",
+    "estimated_total_cost": 16766.24972343445
+  }
+}

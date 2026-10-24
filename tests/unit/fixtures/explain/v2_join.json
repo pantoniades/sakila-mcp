@@ -1,0 +1,56 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT c.email, o.amount FROM customer c JOIN orders o ON o.customer_id = c.id WHERE o.status = 'paid'",
+  "explain": {
+    "query": "/* select#1 */ select `c`.`email` AS `email`,`o`.`amount` AS `amount` from `sakila_mcp_test`.`customer` `c` join `sakila_mcp_test`.`orders` `o` where ((`c`.`id` = `o`.`customer_id`) and (`o`.`status` = 'paid'))",
+    "inputs": [
+      {
+        "inputs": [
+          {
+            "alias": "o",
+            "operation": "Table scan on o",
+            "table_name": "orders",
+            "access_type": "table",
+            "schema_name": "sakila_mcp_test",
+            "used_columns": [
+              "customer_id",
+              "amount",
+              "status"
+            ],
+            "estimated_rows": 1000.0,
+            "estimated_total_cost": 101.25
+          }
+        ],
+        "condition": "(o.`status` = 'paid')",
+        "operation": "Filter: (o.`status` = 'paid')",
+        "access_type": "filter",
+        "estimated_rows": 333.3333432674408,
+        "estimated_total_cost": 101.25
+      },
+      {
+        "alias": "c",
+        "covering": false,
+        "operation": "Single-row index lookup on c using PRIMARY (id=o.customer_id)",
+        "index_name": "PRIMARY",
+        "table_name": "customer",
+        "access_type": "index",
+        "schema_name": "sakila_mcp_test",
+        "used_columns": [
+          "id",
+          "email"
+        ],
+        "estimated_rows": 1.0,
+        "lookup_condition": "id=o.customer_id",
+        "index_access_type": "index_lookup",
+        "estimated_total_cost": 0.2502999999910593
+      }
+    ],
+    "join_type": "inner join",
+    "operation": "Nested loop inner join",
+    "query_type": "select",
+    "access_type": "join",
+    "estimated_rows": 333.3333432674408,
+    "join_algorithm": "nested_loop",
+    "estimated_total_cost": 217.91667014360428
+  }
+}

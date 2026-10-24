@@ -195,6 +195,13 @@ class Database:
         return cnx
 
     def _release(self, cnx: MySQLConnection) -> None:
+        # A truncated result set leaves rows unread. Draining them could take as long as
+        # the query itself, and cursor.close() / cmd_reset_connection() refuse to run
+        # with a pending result ("Unread result found"). Closing the socket is instant
+        # and the server abandons the statement, so throw the connection away.
+        if cnx.unread_result:
+            _discard(cnx)
+            return
         try:
             cnx.cmd_reset_connection()
         except mysql.connector.Error:

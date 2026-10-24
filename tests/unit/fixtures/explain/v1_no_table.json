@@ -1,0 +1,10 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT 1 + 1",
+  "explain": {
+    "query_block": {
+      "select_id": 1,
+      "message": "No tables used"
+    }
+  }
+}

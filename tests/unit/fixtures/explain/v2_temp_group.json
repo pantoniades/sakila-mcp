@@ -1,0 +1,31 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT note, COUNT(*) FROM orders GROUP BY note",
+  "explain": {
+    "query": "/* select#1 */ select `sakila_mcp_test`.`orders`.`note` AS `note`,count(0) AS `COUNT(*)` from `sakila_mcp_test`.`orders` group by `sakila_mcp_test`.`orders`.`note`",
+    "inputs": [
+      {
+        "inputs": [
+          {
+            "operation": "Table scan on orders",
+            "table_name": "orders",
+            "access_type": "table",
+            "schema_name": "sakila_mcp_test",
+            "used_columns": [
+              "id",
+              "note"
+            ],
+            "estimated_rows": 1000.0,
+            "estimated_total_cost": 101.25
+          }
+        ],
+        "operation": "Aggregate using temporary table",
+        "access_type": "temp_table_aggregate"
+      }
+    ],
+    "operation": "Table scan on <temporary>",
+    "query_type": "select",
+    "table_name": "<temporary>",
+    "access_type": "table"
+  }
+}

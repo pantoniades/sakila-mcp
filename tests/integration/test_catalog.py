@@ -1,50 +1,17 @@
 """Step 4: list_databases, list_tables, describe_table."""
 
-from typing import Any
-
 import pytest
-from mcp.client import Client
-from mcp.types import CallToolResult, TextContent
 
 from sakila_mcp.config import Config
 from sakila_mcp.pool import Database
-from sakila_mcp.server import build_server
 
-from .conftest import OTHER_DB, TEST_DB
+from .conftest import OTHER_DB, TEST_DB, call_tool, call_tool_error
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
 
-async def _call(
-    database: Database, config: Config, tool: str, args: dict[str, Any]
-) -> dict[str, Any]:
-    result = await build_server(config, database).call_tool(tool, args)
-    assert isinstance(result, CallToolResult)
-    assert not result.is_error
-    assert result.structured_content is not None
-    content: dict[str, Any] = result.structured_content
-    # Tools that can refuse return a union, which the SDK wraps as {"result": ...}.
-    if set(content) == {"result"}:
-        inner: dict[str, Any] = content["result"]
-        return inner
-    return content
-
-
-async def _call_error(database: Database, config: Config, tool: str, args: dict[str, Any]) -> str:
-    """Call a tool expected to fail with a tool error; return the error text.
-
-    Goes through an in-memory client: in-process ``MCPServer.call_tool`` raises
-    ``ToolError``, and only the protocol layer turns it into ``isError: true``.
-    """
-    async with Client(build_server(config, database)) as client:
-        result = await client.call_tool(tool, args)
-    assert result.is_error
-    assert result.structured_content is None
-    return "".join(c.text for c in result.content if isinstance(c, TextContent))
-
-
 async def test_list_databases_applies_allowlist(database: Database, config: Config) -> None:
-    result = await _call(database, config, "list_databases", {})
+    result = await call_tool(database, config, "list_databases", {})
     names = {d["name"]: d["system"] for d in result["databases"]}
     assert names[TEST_DB] is False
     assert names["information_schema"] is True
@@ -54,14 +21,14 @@ async def test_list_databases_applies_allowlist(database: Database, config: Conf
 
 async def test_list_databases_empty_allowlist(database: Database, config: Config) -> None:
     open_config = config.model_copy(update={"database_allowlist": []})
-    result = await _call(database, open_config, "list_databases", {})
+    result = await call_tool(database, open_config, "list_databases", {})
     names = {d["name"] for d in result["databases"]}
     assert {TEST_DB, OTHER_DB} <= names
     assert "mysql" not in names
 
 
 async def test_list_tables(database: Database, config: Config) -> None:
-    result = await _call(database, config, "list_tables", {"database": TEST_DB})
+    result = await call_tool(database, config, "list_tables", {"database": TEST_DB})
     assert result["database"] == TEST_DB
     tables = {t["name"]: t for t in result["tables"]}
     assert {"customer", "orders", "numbers", "blobs", "customer_order_totals"} <= set(tables)
@@ -77,12 +44,12 @@ async def test_list_tables(database: Database, config: Config) -> None:
 
 
 async def test_list_tables_system_schema(database: Database, config: Config) -> None:
-    result = await _call(database, config, "list_tables", {"database": "information_schema"})
+    result = await call_tool(database, config, "list_tables", {"database": "information_schema"})
     assert "TABLES" in {t["name"] for t in result["tables"]}
 
 
 async def test_list_tables_refuses_non_allowlisted(database: Database, config: Config) -> None:
-    result = await _call(database, config, "list_tables", {"database": OTHER_DB})
+    result = await call_tool(database, config, "list_tables", {"database": OTHER_DB})
     assert result["refused"] is True
     assert result["code"] == "database_not_allowed"
 
@@ -90,13 +57,13 @@ async def test_list_tables_refuses_non_allowlisted(database: Database, config: C
 async def test_list_tables_missing_database(database: Database, config: Config) -> None:
     missing = "sakila_mcp_missing"
     wider = config.model_copy(update={"database_allowlist": [TEST_DB, missing]})
-    message = await _call_error(database, wider, "list_tables", {"database": missing})
+    message = await call_tool_error(database, wider, "list_tables", {"database": missing})
     assert "does not exist" in message
     assert "list_databases" in message
 
 
 async def test_describe_customer(database: Database, config: Config) -> None:
-    result = await _call(
+    result = await call_tool(
         database, config, "describe_table", {"database": TEST_DB, "table": "customer"}
     )
     assert result["table_type"] == "BASE TABLE"
@@ -129,7 +96,7 @@ async def test_describe_customer(database: Database, config: Config) -> None:
 
 
 async def test_describe_foreign_key(database: Database, config: Config) -> None:
-    result = await _call(
+    result = await call_tool(
         database, config, "describe_table", {"database": TEST_DB, "table": "orders"}
     )
     assert result["foreign_keys"] == [
@@ -149,7 +116,7 @@ async def test_describe_foreign_key(database: Database, config: Config) -> None:
 
 
 async def test_describe_view(database: Database, config: Config) -> None:
-    result = await _call(
+    result = await call_tool(
         database,
         config,
         "describe_table",
@@ -166,7 +133,7 @@ async def test_describe_view(database: Database, config: Config) -> None:
 
 
 async def test_describe_missing_table(database: Database, config: Config) -> None:
-    message = await _call_error(
+    message = await call_tool_error(
         database, config, "describe_table", {"database": TEST_DB, "table": "no_such_table"}
     )
     assert f"{TEST_DB}.no_such_table does not exist" in message
@@ -174,7 +141,7 @@ async def test_describe_missing_table(database: Database, config: Config) -> Non
 
 
 async def test_describe_refuses_non_allowlisted(database: Database, config: Config) -> None:
-    result = await _call(
+    result = await call_tool(
         database, config, "describe_table", {"database": OTHER_DB, "table": "secret"}
     )
     assert result["refused"] is True

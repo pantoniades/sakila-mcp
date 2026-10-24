@@ -97,6 +97,17 @@ mysql-connector-python (26.x):
   a second login attempt to diagnose (account lockout risk).
 - `VECTOR` columns come back as `array('f', ...)`.
 - The connector logs auth-plugin selection at INFO; `__main__` sets it to WARNING.
+- Do NOT use the prepared cursor (`cursor(prepared=True)`, binary protocol): it crashes
+  decoding `YEAR` ("unpack requires a buffer of 8 bytes") and returns JSON as bytes. It
+  also rewrites `%s` to `?` with a quote-counting regex. `run_query` binds params with
+  SQL-level `PREPARE ... FROM %s` / `SET @p = %s` / `EXECUTE ... USING` instead
+  (text-protocol results; `max_execution_time` still applies, error 3024).
+- A plain `cursor.execute(sql)` with no params argument does no `%` substitution.
+- With rows left unread, `cursor.close()` and `cmd_reset_connection()` raise
+  `InternalError("Unread result found")`; `cnx.close()` is instant and the server drops
+  the statement. The pool discards connections with `cnx.unread_result` set.
+- `cursor.description` entries carry flags at `[7]` (ENUM/SET) and the charset id at
+  `[8]` (63 = binary); TEXT/BLOB and VARCHAR/VARBINARY share wire types.
 
 ## Dev environment
 - Docker is forbidden on this machine; there is no docker-compose.yml.

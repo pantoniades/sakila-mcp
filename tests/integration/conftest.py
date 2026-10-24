@@ -7,13 +7,17 @@ import os
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from urllib.parse import unquote, urlsplit
 
 import pytest
+from mcp.client import Client
+from mcp.types import CallToolResult, TextContent
 
 from sakila_mcp.config import Config
 from sakila_mcp.pool import Database
 from sakila_mcp.safety.redact import register_secret
+from sakila_mcp.server import build_server
 
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env.test"
 TEST_DB = "sakila_mcp_test"
@@ -75,3 +79,34 @@ def database(config: Config) -> Iterator[Database]:
     db.open()
     yield db
     db.close()
+
+
+async def call_tool(
+    database: Database, config: Config, tool: str, args: dict[str, Any]
+) -> dict[str, Any]:
+    """Call a tool expected to succeed; return its structured result (unwrapped)."""
+    result = await build_server(config, database).call_tool(tool, args)
+    assert isinstance(result, CallToolResult)
+    assert not result.is_error
+    assert result.structured_content is not None
+    content: dict[str, Any] = result.structured_content
+    # Tools that can refuse return a union, which the SDK wraps as {"result": ...}.
+    if set(content) == {"result"}:
+        inner: dict[str, Any] = content["result"]
+        return inner
+    return content
+
+
+async def call_tool_error(
+    database: Database, config: Config, tool: str, args: dict[str, Any]
+) -> str:
+    """Call a tool expected to fail with a tool error; return the error text.
+
+    Goes through an in-memory client: in-process ``MCPServer.call_tool`` raises
+    ``ToolError``, and only the protocol layer turns it into ``isError: true``.
+    """
+    async with Client(build_server(config, database)) as client:
+        result = await client.call_tool(tool, args)
+    assert result.is_error
+    assert result.structured_content is None
+    return "".join(c.text for c in result.content if isinstance(c, TextContent))

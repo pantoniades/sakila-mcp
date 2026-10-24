@@ -1,0 +1,30 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT * FROM orders WHERE note LIKE '%5%'",
+  "explain": {
+    "query": "/* select#1 */ select `sakila_mcp_test`.`orders`.`id` AS `id`,`sakila_mcp_test`.`orders`.`customer_id` AS `customer_id`,`sakila_mcp_test`.`orders`.`amount` AS `amount`,`sakila_mcp_test`.`orders`.`status` AS `status`,`sakila_mcp_test`.`orders`.`note` AS `note` from `sakila_mcp_test`.`orders` where (`sakila_mcp_test`.`orders`.`note` like '%5%')",
+    "inputs": [
+      {
+        "operation": "Table scan on orders",
+        "table_name": "orders",
+        "access_type": "table",
+        "schema_name": "sakila_mcp_test",
+        "used_columns": [
+          "id",
+          "customer_id",
+          "amount",
+          "status",
+          "note"
+        ],
+        "estimated_rows": 1000.0,
+        "estimated_total_cost": 101.25
+      }
+    ],
+    "condition": "(orders.note like '%5%')",
+    "operation": "Filter: (orders.note like '%5%')",
+    "query_type": "select",
+    "access_type": "filter",
+    "estimated_rows": 111.10000312328339,
+    "estimated_total_cost": 101.25
+  }
+}

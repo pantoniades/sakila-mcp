@@ -1,0 +1,77 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT * FROM customer WHERE id IN (SELECT customer_id FROM orders WHERE amount > 500)",
+  "explain": {
+    "query_block": {
+      "select_id": 1,
+      "cost_info": {
+        "query_cost": "236.83"
+      },
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "customer",
+            "access_type": "ALL",
+            "possible_keys": [
+              "PRIMARY"
+            ],
+            "rows_examined_per_scan": 500,
+            "rows_produced_per_join": 500,
+            "filtered": "100.00",
+            "cost_info": {
+              "read_cost": "1.25",
+              "eval_cost": "50.00",
+              "prefix_cost": "51.25",
+              "data_read_per_join": "710K"
+            },
+            "used_columns": [
+              "id",
+              "email",
+              "name",
+              "created_at",
+              "profile"
+            ]
+          }
+        },
+        {
+          "table": {
+            "table_name": "<subquery2>",
+            "access_type": "eq_ref",
+            "key": "<auto_distinct_key>",
+            "key_length": "4",
+            "ref": [
+              "sakila_mcp_test.customer.id"
+            ],
+            "rows_examined_per_scan": 1,
+            "materialized_from_subquery": {
+              "using_temporary_table": true,
+              "query_block": {
+                "table": {
+                  "table_name": "orders",
+                  "access_type": "ALL",
+                  "possible_keys": [
+                    "idx_customer_status"
+                  ],
+                  "rows_examined_per_scan": 1000,
+                  "rows_produced_per_join": 333,
+                  "filtered": "33.33",
+                  "cost_info": {
+                    "read_cost": "67.92",
+                    "eval_cost": "33.33",
+                    "prefix_cost": "101.25",
+                    "data_read_per_join": "10K"
+                  },
+                  "used_columns": [
+                    "customer_id",
+                    "amount"
+                  ],
+                  "attached_condition": "(`sakila_mcp_test`.`orders`.`amount` > 500.00)"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

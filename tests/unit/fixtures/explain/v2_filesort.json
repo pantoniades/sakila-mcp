@@ -1,0 +1,32 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT * FROM orders ORDER BY amount DESC",
+  "explain": {
+    "query": "/* select#1 */ select `sakila_mcp_test`.`orders`.`id` AS `id`,`sakila_mcp_test`.`orders`.`customer_id` AS `customer_id`,`sakila_mcp_test`.`orders`.`amount` AS `amount`,`sakila_mcp_test`.`orders`.`status` AS `status`,`sakila_mcp_test`.`orders`.`note` AS `note` from `sakila_mcp_test`.`orders` order by `sakila_mcp_test`.`orders`.`amount` desc",
+    "inputs": [
+      {
+        "operation": "Table scan on orders",
+        "table_name": "orders",
+        "access_type": "table",
+        "schema_name": "sakila_mcp_test",
+        "used_columns": [
+          "id",
+          "customer_id",
+          "amount",
+          "status",
+          "note"
+        ],
+        "estimated_rows": 1000.0,
+        "estimated_total_cost": 101.25
+      }
+    ],
+    "operation": "Sort: orders.amount DESC",
+    "query_type": "select",
+    "access_type": "sort",
+    "sort_fields": [
+      "orders.amount DESC"
+    ],
+    "estimated_rows": 1000.0,
+    "estimated_total_cost": 101.25
+  }
+}

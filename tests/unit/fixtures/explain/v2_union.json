@@ -1,0 +1,58 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT id FROM customer UNION SELECT customer_id FROM orders",
+  "explain": {
+    "query": "/* select#1 */ select `sakila_mcp_test`.`customer`.`id` AS `id` from `sakila_mcp_test`.`customer` union /* select#2 */ select `sakila_mcp_test`.`orders`.`customer_id` AS `customer_id` from `sakila_mcp_test`.`orders`",
+    "inputs": [
+      {
+        "union": true,
+        "inputs": [
+          {
+            "covering": true,
+            "operation": "Covering index scan on customer using idx_name_created",
+            "index_name": "idx_name_created",
+            "table_name": "customer",
+            "access_type": "index",
+            "schema_name": "sakila_mcp_test",
+            "used_columns": [
+              "id"
+            ],
+            "estimated_rows": 500.0,
+            "index_access_type": "index_scan",
+            "estimated_total_cost": 51.25
+          },
+          {
+            "covering": true,
+            "operation": "Covering index scan on orders using idx_customer_status",
+            "index_name": "idx_customer_status",
+            "table_name": "orders",
+            "access_type": "index",
+            "schema_name": "sakila_mcp_test",
+            "used_columns": [
+              "customer_id"
+            ],
+            "estimated_rows": 1000.0,
+            "index_access_type": "index_scan",
+            "estimated_total_cost": 101.25
+          }
+        ],
+        "operation": "Union materialize with deduplication",
+        "access_type": "materialize",
+        "deduplication": true,
+        "estimated_rows": 1500.0,
+        "estimated_total_cost": 302.5,
+        "estimated_first_row_cost": 302.5
+      }
+    ],
+    "operation": "Table scan on <union temporary>",
+    "query_type": "select",
+    "table_name": "<union temporary>",
+    "access_type": "table",
+    "used_columns": [
+      "id"
+    ],
+    "estimated_rows": 1500.0,
+    "estimated_total_cost": 323.75,
+    "estimated_first_row_cost": 302.51416666666665
+  }
+}

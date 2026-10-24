@@ -1,0 +1,33 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT * FROM orders WHERE note LIKE '%5%'",
+  "explain": {
+    "query_block": {
+      "select_id": 1,
+      "cost_info": {
+        "query_cost": "101.25"
+      },
+      "table": {
+        "table_name": "orders",
+        "access_type": "ALL",
+        "rows_examined_per_scan": 1000,
+        "rows_produced_per_join": 111,
+        "filtered": "11.11",
+        "cost_info": {
+          "read_cost": "90.14",
+          "eval_cost": "11.11",
+          "prefix_cost": "101.25",
+          "data_read_per_join": "3K"
+        },
+        "used_columns": [
+          "id",
+          "customer_id",
+          "amount",
+          "status",
+          "note"
+        ],
+        "attached_condition": "(`sakila_mcp_test`.`orders`.`note` like '%5%')"
+      }
+    }
+  }
+}

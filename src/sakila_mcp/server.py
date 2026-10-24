@@ -4,7 +4,7 @@ import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
-from typing import Annotated
+from typing import Annotated, Literal
 
 import mysql.connector
 from mcp.server import MCPServer
@@ -12,15 +12,18 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from sakila_mcp import __version__, catalog
+from sakila_mcp import __version__, catalog, query
 from sakila_mcp.catalog import text as _text
 from sakila_mcp.config import Config
 from sakila_mcp.models.catalog import DatabaseList, TableDescription, TableList
 from sakila_mcp.models.common import Refusal
+from sakila_mcp.models.query import ExplainResult, QueryResult
 from sakila_mcp.models.server import ServerInfo
 from sakila_mcp.pool import Database, DatabaseError
+from sakila_mcp.query import ParamValue
 from sakila_mcp.safety.allowlist import check_access
-from sakila_mcp.safety.classifier import TableRef
+from sakila_mcp.safety.classifier import Kind, TableRef
+from sakila_mcp.safety.policy import evaluate
 from sakila_mcp.safety.redact import redact
 
 SERVER_NAME = "sakila-mcp"
@@ -44,14 +47,28 @@ _SERVER_INFO_VARIABLES = (
 )
 
 
+# ER_QUERY_TIMEOUT: max_execution_time (session setting or hint) interrupted a SELECT.
+_ER_QUERY_TIMEOUT = 3024
+
+
 @contextmanager
-def _infrastructure_errors() -> Iterator[None]:
-    """Turn connection/server failures into tool errors with redacted text."""
+def _mysql_errors(statement_timeout_ms: int = 0) -> Iterator[None]:
+    """Turn MySQL failures into tool errors with redacted text.
+
+    Covers infrastructure failures (connection, auth) and errors in the caller's SQL
+    (syntax, unknown column, wrong parameter count); both are tool errors, unlike
+    policy refusals, which are results.
+    """
     try:
         yield
     except DatabaseError as exc:
         raise ToolError(str(exc)) from None
     except mysql.connector.Error as exc:
+        if exc.errno == _ER_QUERY_TIMEOUT:
+            raise ToolError(
+                f"The query exceeded the {statement_timeout_ms} ms statement timeout and was "
+                "stopped. Make it more selective, or check its plan with explain_query."
+            ) from None
         raise ToolError(redact(f"MySQL error: {exc}")) from None
 
 
@@ -61,6 +78,28 @@ DatabaseName = Annotated[
 TableName = Annotated[
     str, Field(min_length=1, max_length=64, description="Table or view name, exact case.")
 ]
+DefaultDatabase = Annotated[
+    str | None,
+    Field(
+        min_length=1,
+        max_length=64,
+        description="Default database for unqualified table names. Omit if every name "
+        "is qualified as db.table.",
+    ),
+]
+Sql = Annotated[str, Field(min_length=1, max_length=100_000, description="One SQL statement.")]
+Params = Annotated[
+    list[ParamValue] | None,
+    Field(
+        max_length=100,
+        description="Values for ? placeholders, in order. Bound by the server, never "
+        "spliced into the SQL. SELECT, TABLE and VALUES only.",
+    ),
+]
+
+# Statement kinds that can carry parameters or be EXPLAINed. MySQL cannot PREPARE most
+# SHOW forms with placeholders (SHOW TABLES LIKE ? is a syntax error).
+_QUERY_KINDS = frozenset({Kind.SELECT, Kind.TABLE, Kind.VALUES})
 
 
 # Unknown objects are caller errors (a tool error the caller can correct), not refusals.
@@ -86,7 +125,8 @@ def _as_bool(value: str | None) -> bool | None:
     return None if value is None else value.upper() in {"ON", "1"}
 
 
-def build_server(config: Config, database: Database) -> MCPServer:
+# One closure per tool keeps registration static and in one place; hence the length.
+def build_server(config: Config, database: Database) -> MCPServer:  # noqa: PLR0915
     """Build the MCP server for one MySQL target. ``database`` must be opened before use."""
     allowlist = config.database_allowlist
     database_pool = database  # tools take a ``database`` argument that shadows the name
@@ -106,7 +146,7 @@ def build_server(config: Config, database: Database) -> MCPServer:
     )
     def server_info() -> ServerInfo:
         caps = database.capabilities
-        with _infrastructure_errors(), database.connection() as cnx:
+        with _mysql_errors(), database.connection() as cnx:
             cursor = cnx.cursor()
             placeholders = ", ".join(["%s"] * len(_SERVER_INFO_VARIABLES))
             cursor.execute(
@@ -143,7 +183,7 @@ def build_server(config: Config, database: Database) -> MCPServer:
         "schema. Call it before list_tables when you do not know the database name.",
     )
     def list_databases() -> DatabaseList:
-        with _infrastructure_errors(), database.connection() as cnx:
+        with _mysql_errors(), database.connection() as cnx:
             cursor = cnx.cursor()
             result = catalog.list_databases(cursor, allowlist)
             cursor.close()
@@ -159,7 +199,7 @@ def build_server(config: Config, database: Database) -> MCPServer:
         refusal = check_access([], [database], None, allowlist)
         if refusal is not None:
             return refusal
-        with _infrastructure_errors(), database_pool.connection() as cnx:
+        with _mysql_errors(), database_pool.connection() as cnx:
             cursor = cnx.cursor()
             exists = catalog.database_exists(cursor, database)
             tables = catalog.list_tables(cursor, database) if exists else []
@@ -178,13 +218,61 @@ def build_server(config: Config, database: Database) -> MCPServer:
         refusal = check_access([TableRef(database, table)], [], None, allowlist)
         if refusal is not None:
             return refusal
-        with _infrastructure_errors(), database_pool.connection() as cnx:
+        with _mysql_errors(), database_pool.connection() as cnx:
             cursor = cnx.cursor()
             description = catalog.describe_table(cursor, database, table)
             cursor.close()
         if description is None:
             raise _table_not_found(database, table)
         return description
+
+    @server.tool(
+        annotations=READ_ONLY,
+        description="Runs one read-only statement (SELECT, WITH, TABLE, VALUES, SHOW, "
+        "DESCRIBE or EXPLAIN) and returns columns and rows, at most "
+        f"{config.max_rows} rows with truncated=true if there were more. Use ? "
+        "placeholders with params for values. Refused statements return refused=true "
+        "with a reason and a suggestion.",
+    )
+    def run_query(
+        sql: Sql, database: DefaultDatabase = None, params: Params = None
+    ) -> QueryResult | Refusal:
+        decision = evaluate(sql, config, database)
+        if isinstance(decision, Refusal):
+            return decision
+        if params and decision.classification.kind not in _QUERY_KINDS:
+            raise ToolError(
+                "params are supported for SELECT, TABLE and VALUES statements only; "
+                "write the value into this statement as a literal."
+            )
+        with _mysql_errors(config.statement_timeout_ms), database_pool.connection() as cnx:
+            if database is not None:
+                cnx.cmd_init_db(database)  # undone by the session reset on release
+            return query.run(cnx, sql, params or [], config.max_rows, config.max_cell_bytes)
+
+    @server.tool(
+        annotations=READ_ONLY,
+        description="Returns the execution plan for one SELECT, TABLE or VALUES statement "
+        "without running it: the EXPLAIN FORMAT=JSON document plus a summary (full table "
+        "scans, filesort, temporary table, max estimated rows), or the TREE text. "
+        "Use it before running a query that may be slow.",
+    )
+    def explain_query(
+        sql: Sql, database: DefaultDatabase = None, format: Literal["json", "tree"] = "json"
+    ) -> ExplainResult | Refusal:
+        decision = evaluate(sql, config, database)
+        if isinstance(decision, Refusal):
+            return decision
+        if decision.classification.kind not in _QUERY_KINDS:
+            raise ToolError(
+                "explain_query explains SELECT, TABLE and VALUES statements, not "
+                f"{decision.classification.kind.upper()}. Pass the query itself without "
+                "EXPLAIN; run SHOW and DESCRIBE statements with run_query."
+            )
+        with _mysql_errors(config.statement_timeout_ms), database_pool.connection() as cnx:
+            if database is not None:
+                cnx.cmd_init_db(database)
+            return query.run_explain(cnx, sql, format)
 
     @server.resource(
         CAPABILITIES_URI,

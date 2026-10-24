@@ -1,0 +1,43 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT t.s, COUNT(*) FROM (SELECT status s FROM orders) t GROUP BY t.s ORDER BY 2",
+  "explain": {
+    "query": "/* select#1 */ select `sakila_mcp_test`.`orders`.`status` AS `s`,count(0) AS `COUNT(*)` from `sakila_mcp_test`.`orders` group by `sakila_mcp_test`.`orders`.`status` order by count(0)",
+    "inputs": [
+      {
+        "inputs": [
+          {
+            "inputs": [
+              {
+                "covering": true,
+                "operation": "Covering index scan on orders using idx_customer_status",
+                "index_name": "idx_customer_status",
+                "table_name": "orders",
+                "access_type": "index",
+                "schema_name": "sakila_mcp_test",
+                "used_columns": [
+                  "id",
+                  "status"
+                ],
+                "estimated_rows": 1000.0,
+                "index_access_type": "index_scan",
+                "estimated_total_cost": 101.25
+              }
+            ],
+            "operation": "Aggregate using temporary table",
+            "access_type": "temp_table_aggregate"
+          }
+        ],
+        "operation": "Table scan on <temporary>",
+        "table_name": "<temporary>",
+        "access_type": "table"
+      }
+    ],
+    "operation": "Sort: COUNT(*)",
+    "query_type": "select",
+    "access_type": "sort",
+    "sort_fields": [
+      "COUNT(*)"
+    ]
+  }
+}

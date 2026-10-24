@@ -1,0 +1,13 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT * FROM customer WHERE id = 7",
+  "explain": {
+    "query": "/* select#1 */ select '7' AS `id`,'user7@example.com' AS `email`,'User 7' AS `name`,'2026-10-23 14:15:07.279317' AS `created_at`,'{\"n\": 7, \"tier\": \"pro\"}' AS `profile` from `sakila_mcp_test`.`customer` where true",
+    "operation": "Rows fetched before execution",
+    "query_type": "select",
+    "access_type": "rows_fetched_before_execution",
+    "estimated_rows": 1.0,
+    "estimated_total_cost": 0.0,
+    "estimated_first_row_cost": 0.0
+  }
+}

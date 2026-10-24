@@ -22,6 +22,8 @@ async def test_tools_registered_read_only() -> None:
         "list_databases",
         "list_tables",
         "describe_table",
+        "run_query",
+        "explain_query",
     ]
     for tool in tools:
         assert tool.annotations is not None

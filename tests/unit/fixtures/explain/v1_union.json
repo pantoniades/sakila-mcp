@@ -1,0 +1,82 @@
+{
+  "mysql_version": "8.4.11",
+  "sql": "SELECT id FROM customer UNION SELECT customer_id FROM orders",
+  "explain": {
+    "query_block": {
+      "union_result": {
+        "using_temporary_table": true,
+        "select_id": 3,
+        "table_name": "<union1,2>",
+        "access_type": "ALL",
+        "query_specifications": [
+          {
+            "dependent": false,
+            "cacheable": true,
+            "query_block": {
+              "select_id": 1,
+              "cost_info": {
+                "query_cost": "51.25"
+              },
+              "table": {
+                "table_name": "customer",
+                "access_type": "index",
+                "key": "idx_name_created",
+                "used_key_parts": [
+                  "name",
+                  "created_at"
+                ],
+                "key_length": "410",
+                "rows_examined_per_scan": 500,
+                "rows_produced_per_join": 500,
+                "filtered": "100.00",
+                "using_index": true,
+                "cost_info": {
+                  "read_cost": "1.25",
+                  "eval_cost": "50.00",
+                  "prefix_cost": "51.25",
+                  "data_read_per_join": "710K"
+                },
+                "used_columns": [
+                  "id"
+                ]
+              }
+            }
+          },
+          {
+            "dependent": false,
+            "cacheable": true,
+            "query_block": {
+              "select_id": 2,
+              "cost_info": {
+                "query_cost": "101.25"
+              },
+              "table": {
+                "table_name": "orders",
+                "access_type": "index",
+                "key": "idx_customer_status",
+                "used_key_parts": [
+                  "customer_id",
+                  "status"
+                ],
+                "key_length": "5",
+                "rows_examined_per_scan": 1000,
+                "rows_produced_per_join": 1000,
+                "filtered": "100.00",
+                "using_index": true,
+                "cost_info": {
+                  "read_cost": "1.25",
+                  "eval_cost": "100.00",
+                  "prefix_cost": "101.25",
+                  "data_read_per_join": "31K"
+                },
+                "used_columns": [
+                  "customer_id"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
