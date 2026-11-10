@@ -84,7 +84,7 @@ The password never appears in tool results, logs or error text. There's a test f
 Not on PyPI yet. From a checkout:
 
 ```sh
-git clone <repo-url> sakila-mcp
+git clone https://github.com/pantoniades/sakila-mcp.git
 cd sakila-mcp
 uv sync
 uv run sakila-mcp --help
