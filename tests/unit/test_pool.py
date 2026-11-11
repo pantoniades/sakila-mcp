@@ -9,6 +9,7 @@ from sakila_mcp import __version__
 from sakila_mcp.config import Config
 from sakila_mcp.pool import (
     LOCK_WAIT_TIMEOUT_S,
+    Database,
     DatabaseError,
     connect_args,
     describe_connect_error,
@@ -116,3 +117,24 @@ def test_non_auth_error_has_no_plugin_suffix() -> None:
     message = describe_connect_error(exc, None)
     assert "auth plugin" not in message
     assert PASSWORD not in message
+
+
+def test_checkout_discards_idle_connection_when_init_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closed: list[bool] = []
+    idle = SimpleNamespace(close=lambda: closed.append(True))
+    db = Database(Config(user="mcp", password=PASSWORD))
+    db._idle.append(idle)  # type: ignore[arg-type]
+
+    def fail_init(_cnx: Any) -> None:
+        raise DatabaseError("could not clear lexing-related sql_mode flags")
+
+    def fail_connect() -> Any:
+        raise DatabaseError("cannot connect")
+
+    monkeypatch.setattr(db, "_init", fail_init)
+    monkeypatch.setattr(db, "_connect", fail_connect)
+    with pytest.raises(DatabaseError, match="cannot connect"):
+        db._checkout()
+    assert closed == [True]

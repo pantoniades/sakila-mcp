@@ -192,8 +192,9 @@ class Database:
             try:
                 self._init(cnx)
                 return cnx
-            except mysql.connector.Error:
+            except (mysql.connector.Error, DatabaseError):
                 # Probably dropped by the server (wait_timeout) while idle: replace once.
+                # DatabaseError (init_session fail-closed) must discard too, or it leaks.
                 _discard(cnx)
         cnx = self._connect()
         try:
