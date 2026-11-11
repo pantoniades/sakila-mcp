@@ -123,7 +123,11 @@ mysql-connector-python (26.x):
   `explain_json_format_version=1` by default and session-settable to 2, so both EXPLAIN
   JSON shapes are testable. No VECTOR type (the `embeddings` fixture is 9.0+ only, so its
   tests skip). The test account cannot see `sys` or read `performance_schema` unless granted.
-- No 9.x server is available to the tests at present.
+- A second target is a local MySQL 26.10.0 Community (Innovation) server: it has VECTOR
+  (the `embeddings` test runs) and its EXPLAIN JSON v2 wraps the plan in `query_plan`
+  (`json_schema_version` 2.1). Select a server with `SAKILA_MCP_TEST_DSN`; the pytest summary
+  prints which server and DSN source a run used. No 9.0–9.6 or 9.7 server is available to the
+  tests.
 - Host-specific details (server names, addresses) live in the gitignored `CLAUDE.local.md`.
 
 ## Working style
