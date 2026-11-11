@@ -2,7 +2,8 @@
 # Prepare a MySQL server for the integration tests. Run once per server, as an admin:
 #   SAKILA_MCP_TEST_CLIENT_HOST=127.0.0.1 SAKILA_MCP_TEST_PASSWORD=abc123 \
 #     tests/integration/setup.sh -u root -p
-# Arguments are passed to the mysql client (host, port, user, ...).
+# Arguments are passed to the mysql client (host, port, user, ...). Run it in a real
+# terminal so that -p can prompt, or use --login-path instead of -p.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -31,8 +32,14 @@ fi
 [[ $host =~ ^[A-Za-z0-9._:%-]+$ ]] || { echo "invalid SAKILA_MCP_TEST_CLIENT_HOST" >&2; exit 2; }
 [[ $password =~ ^[A-Za-z0-9]+$ ]] || { echo "SAKILA_MCP_TEST_PASSWORD must be letters and digits only" >&2; exit 2; }
 
-# Piped on stdin so the password never appears in the process list.
+# The SQL goes through a private temp file and SOURCE, not stdin: with stdin taken, mysql
+# would read the -p password from the SQL stream instead of prompting. The file is 0600
+# and removed on exit, so the password is neither in the process list nor left on disk.
+umask 077
+sql=$(mktemp)
+trap 'rm -f "$sql"' EXIT
 {
   printf "SET @client_host = '%s', @test_password = '%s';\n" "$host" "$password"
   cat "$here/setup.sql"
-} | mysql "$@"
+} >"$sql"
+mysql "$@" -e "SOURCE $sql"
