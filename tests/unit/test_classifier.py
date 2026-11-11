@@ -143,6 +143,14 @@ def test_builtin_functions_recorded() -> None:
         assert name in result.functions
 
 
+def test_vector_functions_are_builtin() -> None:
+    result = _accepted(
+        "SELECT VECTOR_DIM(v), VECTOR_TO_STRING(v), "
+        "DISTANCE(v, STRING_TO_VECTOR('[1,2]'), 'COSINE') FROM t"
+    )
+    assert result.unknown_functions == []
+
+
 @pytest.mark.parametrize(
     ("sql", "kind", "tables"),
     [

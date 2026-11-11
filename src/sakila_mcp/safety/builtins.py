@@ -3,8 +3,8 @@
 ``BUILTIN_FUNCTIONS`` is deliberately conservative: a real builtin missing from it only
 causes a refusal (reported as an unknown function), never a bypass. Names are upper case.
 
-``_HELP_TOPIC_FUNCTIONS`` was generated from ``mysql.help_topic`` on MySQL 8.4.11 Community
-(run as an admin account)::
+``_HELP_TOPIC_FUNCTIONS`` is the union of ``mysql.help_topic`` on MySQL 8.4.11 and
+26.10.0.0, both Community (run as an admin account)::
 
     SELECT c.name AS category, t.name AS topic
     FROM mysql.help_topic t
@@ -16,7 +16,8 @@ sit under "MBR Functions", so categories are only used to pick what to read):
 
 * Read: Aggregate, Bit, Cast, Comparison, Date and Time, Encryption, Flow Control,
   Geometry/GeometryCollection/LineString/Point/Polygon, GTID, Information, Locking, MBR
-  Functions, Miscellaneous, Numeric, Performance Schema, String, Window, WKB, WKT, XML.
+  Functions, Miscellaneous, Numeric, Performance Schema, String, Window (26.10 files its
+  vector functions here), WKB, WKT, XML.
 * Skipped categories: Internal Functions (not callable by users), Enterprise Encryption
   Functions (loadable functions from a component, not builtins), statements, data types,
   language structure, logical operators.
@@ -27,7 +28,7 @@ sit under "MBR Functions", so categories are only used to pick what to read):
   VALUES (PAREN_KEYWORDS covers those that can precede "(").
 
 ``_MANUAL_FUNCTIONS`` holds names carried over from the earlier hand-written list that
-help_topic does not provide. Nothing 9.x-specific has been added yet.
+help_topic does not provide. Nothing has been added by hand for 9.x or later.
 """
 
 DENIED_FUNCTIONS: frozenset[str] = frozenset(
@@ -151,6 +152,8 @@ _HELP_TOPIC_FUNCTIONS: frozenset[str] = frozenset(
         # Window Functions
         "CUME_DIST", "DENSE_RANK", "FIRST_VALUE", "LAG", "LAST_VALUE", "LEAD", "NTH_VALUE",
         "NTILE", "PERCENT_RANK", "RANK", "ROW_NUMBER",
+        # Vector functions (not in 8.4.11; filed under "Window Functions" on 26.10)
+        "DISTANCE", "STRING_TO_VECTOR", "VECTOR_DIM", "VECTOR_TO_STRING",
         # WKB Functions
         "ST_ASBINARY", "ST_ASTEXT", "ST_GEOMCOLLFROMWKB", "ST_GEOMFROMWKB",
         "ST_LINEFROMWKB", "ST_MLINEFROMWKB", "ST_MPOINTFROMWKB", "ST_MPOLYFROMWKB",
