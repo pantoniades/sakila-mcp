@@ -110,6 +110,11 @@ SET @stmt = CONCAT('GRANT INSERT ON sakila_mcp_test.write_probe TO ', @acct);
 PREPARE stmt FROM @stmt; EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- Summary, so a successful run is not silent.
+SELECT user, host FROM mysql.user WHERE user = 'sakila_mcp_test';
+SELECT table_schema, COUNT(*) AS table_count FROM information_schema.tables
+  WHERE table_schema IN ('sakila_mcp_test', 'sakila_mcp_other') GROUP BY table_schema;
+
 -- Teardown:
 -- DROP USER IF EXISTS 'sakila_mcp_test'@'<the client host you used>';
 -- DROP DATABASE IF EXISTS sakila_mcp_test;

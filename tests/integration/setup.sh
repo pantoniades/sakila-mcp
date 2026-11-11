@@ -38,4 +38,7 @@ fi
 {
   printf "SET @client_host = '%s', @test_password = '%s';\n" "$host" "$password"
   cat "$here/setup.sql"
-} | mysql "$@"
+} | mysql --table "$@"
+
+echo "Done. Test account: sakila_mcp_test@$host" >&2
+echo "DSN: mysql://sakila_mcp_test:<password>@$host:3306/sakila_mcp_test" >&2
