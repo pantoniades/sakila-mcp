@@ -2,8 +2,11 @@
 
 explain_json_format_version=1 (the classic shape) nests "query_block" /
 "nested_loop" / "table" objects. Version 2 (8.3+) is the iterator tree: every node
-has "operation" and "access_type", children under "inputs". The shape is detected
-from the document, not from the server variable, because a session can override it.
+has "operation" and "access_type", children under "inputs". MySQL 26.10 wraps that
+tree in a "query_plan" key next to "query", "query_type" and "json_schema_version"
+(seen on 26.10.0, schema 2.1); the nodes themselves are unchanged. The shape is
+detected from the document, not from the server variable, because a session can
+override it.
 
 Both walkers visit every dict in the document, so they do not depend on where MySQL
 nests subqueries, unions or derived tables. Table names starting with "<" are
@@ -41,6 +44,9 @@ def json_version(doc: dict[str, JsonValue]) -> int:
     if "query_block" in doc:
         return 1
     if "operation" in doc and "access_type" in doc:
+        return 2
+    plan = doc.get("query_plan")
+    if isinstance(plan, dict) and "operation" in plan and "access_type" in plan:
         return 2
     raise UnrecognizedPlan(f"unrecognized EXPLAIN JSON shape (top-level keys: {sorted(doc)})")
 
