@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
+import mysql.connector
 import pytest
 from mcp.client import Client
 from mcp.types import CallToolResult, TextContent
@@ -32,16 +33,55 @@ class Dsn:
     password: str
 
 
-def _read_dsn() -> str | None:
+def _read_dsn_with_source() -> tuple[str, str] | None:
     value = os.environ.get("SAKILA_MCP_TEST_DSN")
     if value:
-        return value
+        return value, "environment"
     if ENV_FILE.is_file():
         for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
             key, sep, rest = line.partition("=")
             if sep and key.strip() == "SAKILA_MCP_TEST_DSN":
-                return rest.strip()
+                return rest.strip(), ENV_FILE.name
     return None
+
+
+def _read_dsn() -> str | None:
+    found = _read_dsn_with_source()
+    return found[0] if found else None
+
+
+def _describe_target() -> str:
+    found = _read_dsn_with_source()
+    if found is None:
+        return "no SAKILA_MCP_TEST_DSN (tests skip)"
+    raw, source = found
+    parts = urlsplit(raw)
+    target = f"{unquote(parts.username or '')}@{parts.hostname}:{parts.port or 3306}"
+    try:
+        cnx = mysql.connector.connect(
+            host=parts.hostname or "127.0.0.1",
+            port=parts.port or 3306,
+            user=unquote(parts.username or ""),
+            password=unquote(parts.password or ""),
+            connection_timeout=5,
+        )
+        try:
+            cursor = cnx.cursor()
+            cursor.execute("SELECT VERSION(), @@version_comment")
+            row: Any = cursor.fetchone()
+            cursor.close()
+        finally:
+            cnx.close()
+        server = f"{row[0]} ({row[1]})" if row else "unknown"
+    except mysql.connector.Error as exc:
+        server = f"unreachable (errno {exc.errno})"
+    return f"{target} [DSN from {source}] server {server}"
+
+
+def pytest_terminal_summary(terminalreporter: Any) -> None:
+    # Summary, not report header: -q hides the header, and the .env.test fallback
+    # (a different server than the one you exported) is easy to forget.
+    terminalreporter.write_line(f"sakila-mcp integration target: {_describe_target()}")
 
 
 @pytest.fixture(scope="session")
