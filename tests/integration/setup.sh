@@ -32,14 +32,10 @@ fi
 [[ $host =~ ^[A-Za-z0-9._:%-]+$ ]] || { echo "invalid SAKILA_MCP_TEST_CLIENT_HOST" >&2; exit 2; }
 [[ $password =~ ^[A-Za-z0-9]+$ ]] || { echo "SAKILA_MCP_TEST_PASSWORD must be letters and digits only" >&2; exit 2; }
 
-# The SQL goes through a private temp file and SOURCE, not stdin: with stdin taken, mysql
-# would read the -p password from the SQL stream instead of prompting. The file is 0600
-# and removed on exit, so the password is neither in the process list nor left on disk.
-umask 077
-sql=$(mktemp)
-trap 'rm -f "$sql"' EXIT
+# SQL goes on stdin, so the password never appears in the process list. mysql -p then
+# prompts on the terminal (/dev/tty); without one (CI, an agent shell) it would read the
+# password from this stream instead, so use --login-path there.
 {
   printf "SET @client_host = '%s', @test_password = '%s';\n" "$host" "$password"
   cat "$here/setup.sql"
-} >"$sql"
-mysql "$@" -e "SOURCE $sql"
+} | mysql "$@"
