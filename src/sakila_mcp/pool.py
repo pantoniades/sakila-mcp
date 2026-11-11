@@ -38,15 +38,22 @@ def connect_args(config: Config) -> dict[str, Any]:
         "user": config.user,
         "password": config.password.get_secret_value(),
         "use_pure": True,
+        # A pooled connection must not sit in an open transaction: it would keep an
+        # InnoDB read view (stale data, undo purge held back) between tool calls.
         "autocommit": True,
         "charset": "utf8mb4",
         "connection_timeout": CONNECT_TIMEOUT_S,
+        # Keep values short: the whole attribute block must stay under 255 bytes.
         "conn_attrs": {"program_name": "sakila-mcp", "sakila_mcp_version": __version__},
     }
 
 
 def init_session(cursor: Any, statement_timeout_ms: int) -> None:
-    """Make the session read-only and bounded. Raises DatabaseError if it cannot."""
+    """Make the session read-only and bounded. Raises DatabaseError if it cannot.
+
+    Runs on every checkout, not once per connection: COM_RESET_CONNECTION on release
+    clears session variables and transaction characteristics.
+    """
     cursor.execute("/* sakila-mcp init */ SET SESSION TRANSACTION READ ONLY")
     cursor.execute(
         "/* sakila-mcp init */ SET SESSION max_execution_time = %s, SESSION lock_wait_timeout = %s",
@@ -59,6 +66,8 @@ def init_session(cursor: Any, statement_timeout_ms: int) -> None:
     if kept == flags:
         return
     cursor.execute("/* sakila-mcp init */ SET SESSION sql_mode = %s", (",".join(kept),))
+    # Re-read instead of trusting the SET: the classifier is unsound if any stripped
+    # flag is still active, so fail closed.
     cursor.execute("/* sakila-mcp init */ SELECT @@SESSION.sql_mode")
     (mode,) = cursor.fetchone()
     if STRIPPED_SQL_MODES & {f.upper() for f in str(mode).split(",")}:
@@ -147,6 +156,8 @@ class Database:
         """Check out a connection with a freshly initialized read-only session."""
         if self._capabilities is None or self._closed:
             raise DatabaseError("database is not open")
+        # A busy slot frees within one statement timeout (max_execution_time), plus
+        # room for a reconnect, so waiting longer than that means something is wrong.
         wait_s = self._config.statement_timeout_ms / 1000 + CONNECT_TIMEOUT_S
         if not self._slots.acquire(timeout=wait_s):
             raise DatabaseError(f"all {self._config.pool_size} connections are busy; retry shortly")
@@ -182,7 +193,8 @@ class Database:
                 self._init(cnx)
                 return cnx
             except mysql.connector.Error:
-                _discard(cnx)  # stale idle connection: replace it once
+                # Probably dropped by the server (wait_timeout) while idle: replace once.
+                _discard(cnx)
         cnx = self._connect()
         try:
             self._init(cnx)
@@ -202,6 +214,8 @@ class Database:
         if cnx.unread_result:
             _discard(cnx)
             return
+        # Reset so user variables, temp tables and session settings never leak to the
+        # next caller; init_session re-applies the read-only settings at checkout.
         try:
             cnx.cmd_reset_connection()
         except mysql.connector.Error:

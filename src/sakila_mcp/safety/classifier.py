@@ -55,11 +55,17 @@ class Classification:
     max_execution_time_hint: int | None = None
 
 
+# "(" admits parenthesized query expressions. The first word is only a cheap gate; the
+# AST walk and token checks below are what actually prove the statement is a read
+# (e.g. ``WITH x AS (...) DELETE ...`` starts with an allowed word).
 _ALLOWED_FIRST_WORDS = frozenset(
     {"SELECT", "WITH", "TABLE", "VALUES", "SHOW", "DESCRIBE", "DESC", "EXPLAIN", "("}
 )
 
-# Nodes that must never appear anywhere in an accepted statement's AST.
+# Nodes that must never appear anywhere in an accepted statement's AST. ``Command`` is
+# what sqlglot falls back to for syntax it cannot parse, so listing it makes unknown
+# syntax fail closed. ``Show`` is listed because SHOW is accepted only through the
+# hand-written matcher, never as a nested node.
 _FORBIDDEN_NODES: tuple[type[exp.Expr], ...] = (
     exp.DML,
     exp.DDL,
@@ -85,6 +91,7 @@ _FORBIDDEN_NODES: tuple[type[exp.Expr], ...] = (
     exp.Show,
 )
 
+# Token types that can be followed by "(" without being a function name ('abc'(, 1().
 _STRING_TOKENS = frozenset(t for t in TokenType if t.name.endswith("STRING")) | {
     TokenType.NUMBER,
     TokenType.PARAMETER,
@@ -157,6 +164,8 @@ def _parse_error(exc: Exception) -> Refusal:
 
 
 def _check_single_statement(sql: str, tokens: list[Token]) -> Refusal | None:
+    # The tokenizer drops comments, so whatever follows the final ";" is checked on the
+    # raw text; this also refuses a trailing comment after the semicolon.
     semicolons = [i for i, t in enumerate(tokens) if t.token_type is TokenType.SEMICOLON]
     if not semicolons:
         return None
@@ -171,6 +180,9 @@ def _check_single_statement(sql: str, tokens: list[Token]) -> Refusal | None:
 
 
 def _check_tokens(tokens: list[Token]) -> Refusal | None:
+    # Token level on purpose: sqlglot does not parse INTO after FROM, and a trailing
+    # "LOCK IN SHARE MODE" / ":=" may never reach the AST. These must not depend on a
+    # successful parse.
     for i, tok in enumerate(tokens):
         nxt = tokens[i + 1].text.upper() if i + 1 < len(tokens) else ""
         if tok.token_type is TokenType.INTO:
@@ -201,6 +213,7 @@ def _check_hints(tokens: list[Token]) -> int | Refusal | None:
     for tok in tokens:
         if tok.token_type is not TokenType.HINT:
             continue
+        # SET_VAR could override the per-session limits and sql_mode pinned at checkout.
         if _SET_VAR_RE.search(tok.text):
             return _refuse(
                 "set_var_hint",
@@ -226,7 +239,9 @@ class _ShowCursor:
     """Word-level cursor over SHOW tokens. Quoted identifiers are never keywords."""
 
     def __init__(self, tokens: list[Token]) -> None:
-        # (word, original text, may_be_identifier, is_string)
+        # (word, original text, may_be_identifier, is_string). A quoted identifier gets
+        # an empty word so `from` can never match a keyword. One token's text can hold
+        # several words (multi-word keywords), hence the split.
         self.items: list[tuple[str, str, bool, bool]] = []
         for tok in tokens:
             if tok.token_type is TokenType.IDENTIFIER:
@@ -354,6 +369,8 @@ def _match_show(c: _ShowCursor) -> _ShowResult | None:
 
 
 def _classify_show(tokens: list[Token]) -> Classification | Refusal:
+    # SHOW is not parsed, so a WHERE clause would carry expressions (calls, subqueries)
+    # that the function and table checks never see.
     if any(t.token_type is TokenType.WHERE for t in tokens):
         return _refuse(
             "show_where",
@@ -393,6 +410,7 @@ def _classify_parsed(
         return _refuse("multi_statement", "Only one statement per call is allowed.")
     tree = statements[0]
 
+    # Walk every node, not just the root: writes can hide in CTEs and subqueries.
     for node in tree.walk():
         if isinstance(node, _FORBIDDEN_NODES):
             return _refuse(
@@ -405,6 +423,7 @@ def _classify_parsed(
             return _refuse("into_clause", "SELECT ... INTO is not allowed.")
         if isinstance(node, exp.Lock):
             return _refuse("locking_clause", "Locking reads are not allowed.")
+        # sqlglot parses ``@v := expr`` as PropertyEQ (belt and braces with COLON_EQ).
         if isinstance(node, exp.PropertyEQ):
             return _refuse("variable_assignment", "Variable assignment with := is not allowed.")
 
@@ -503,6 +522,8 @@ def _is_column_list(
     """True if ``tokens[i](`` defines a CTE or derived-table column list, not a call."""
     if i == 0:
         return False
+    # ``WITH c (a, b) AS (...)`` and ``(...) AS t (a, b)`` put a name before "(" without
+    # calling anything; identify them by the CTE/alias names the parser found.
     name = tokens[i].text.lower()
     prev = tokens[i - 1].token_type
     if name in alias_names and prev in (TokenType.ALIAS, TokenType.R_PAREN):
@@ -534,8 +555,11 @@ def _scan_function_calls(
             continue
         name = tok.text.upper()
         qualified = i >= 2 and tokens[i - 1].token_type is TokenType.DOT
+        # Denied first and regardless of quoting or qualification: refusing is always safe.
         if name in DENIED_FUNCTIONS:
             return functions, unknown, name
+        # ``db.f(`` can only be a stored function, never a builtin. A quoted name is
+        # likewise never a builtin: `now`() would call a stored function named now.
         if qualified:
             full = f"{tokens[i - 2].text.upper()}.{name}"
             if full not in unknown:
