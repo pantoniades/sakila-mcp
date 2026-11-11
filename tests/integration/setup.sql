@@ -1,9 +1,9 @@
 -- sakila_mcp integration-test fixture. Run once as an administrative account:
---   mysql -u root -p < tests/integration/setup.sql
--- Replace CHANGE_ME below first (alphanumeric keeps the DSN free of URL escaping), and
--- CLIENT_HOST with the address the server sees the test client connect from
--- (127.0.0.1 for a local server).
--- Teardown is at the bottom, commented out.
+--   SAKILA_MCP_TEST_CLIENT_HOST=127.0.0.1 SAKILA_MCP_TEST_PASSWORD=... \
+--     tests/integration/setup.sh -u root -p
+-- Do not run this file directly: tests/integration/setup.sh sets @client_host and
+-- @test_password from the environment and pipes this file to mysql.
+-- Not re-runnable: run the teardown at the bottom first if the schemas already exist.
 
 CREATE DATABASE IF NOT EXISTS sakila_mcp_test
   CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
@@ -93,16 +93,24 @@ CREATE TABLE secret (
 
 INSERT INTO secret VALUES (1, 'must not be readable through the server');
 
--- Test account: TCP from CLIENT_HOST, caching_sha2_password, grants as recommended for
--- production plus the single INSERT grant explained above.
-CREATE USER IF NOT EXISTS 'sakila_mcp_test'@'CLIENT_HOST'
-  IDENTIFIED WITH caching_sha2_password BY 'CHANGE_ME';
-GRANT SELECT, SHOW VIEW ON sakila_mcp_test.*  TO 'sakila_mcp_test'@'CLIENT_HOST';
-GRANT SELECT, SHOW VIEW ON sakila_mcp_other.* TO 'sakila_mcp_test'@'CLIENT_HOST';
-GRANT PROCESS, REPLICATION CLIENT ON *.*     TO 'sakila_mcp_test'@'CLIENT_HOST';
-GRANT INSERT ON sakila_mcp_test.write_probe   TO 'sakila_mcp_test'@'CLIENT_HOST';
+-- Test account: TCP from @client_host, caching_sha2_password, grants as recommended for
+-- production plus the single INSERT grant explained above. GRANT and CREATE USER cannot
+-- take variables, so the statements are built with QUOTE() and prepared.
+SET @acct = CONCAT('''sakila_mcp_test''', '@', QUOTE(@client_host));
+SET @stmt = CONCAT('CREATE USER IF NOT EXISTS ', @acct,
+  ' IDENTIFIED WITH caching_sha2_password BY ', QUOTE(@test_password));
+PREPARE stmt FROM @stmt; EXECUTE stmt;
+SET @stmt = CONCAT('GRANT SELECT, SHOW VIEW ON sakila_mcp_test.* TO ', @acct);
+PREPARE stmt FROM @stmt; EXECUTE stmt;
+SET @stmt = CONCAT('GRANT SELECT, SHOW VIEW ON sakila_mcp_other.* TO ', @acct);
+PREPARE stmt FROM @stmt; EXECUTE stmt;
+SET @stmt = CONCAT('GRANT PROCESS, REPLICATION CLIENT ON *.* TO ', @acct);
+PREPARE stmt FROM @stmt; EXECUTE stmt;
+SET @stmt = CONCAT('GRANT INSERT ON sakila_mcp_test.write_probe TO ', @acct);
+PREPARE stmt FROM @stmt; EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Teardown:
--- DROP USER IF EXISTS 'sakila_mcp_test'@'CLIENT_HOST';
+-- DROP USER IF EXISTS 'sakila_mcp_test'@'<the client host you used>';
 -- DROP DATABASE IF EXISTS sakila_mcp_test;
 -- DROP DATABASE IF EXISTS sakila_mcp_other;

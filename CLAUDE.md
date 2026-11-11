@@ -114,9 +114,11 @@ mysql-connector-python (26.x):
 - The user installs system tooling (uv, MySQL, …) themselves; ask, don't install.
 - Integration tests run against MySQL 8.4.11 Community on a remote test server, prepared
   with `tests/integration/setup.sql` (schemas `sakila_mcp_test`, `sakila_mcp_other`;
-  account `sakila_mcp_test@CLIENT_HOST`, here the dev machine's IP address). The DSN comes
-  from `SAKILA_MCP_TEST_DSN` or the gitignored `.env.test`. Never print the DSN or
-  password; keep the `CHANGE_ME` and `CLIENT_HOST` placeholders in `setup.sql`.
+  account `sakila_mcp_test@<client host>`, here the dev machine's IP address). Run it with
+  `tests/integration/setup.sh`, which takes `SAKILA_MCP_TEST_CLIENT_HOST` and
+  `SAKILA_MCP_TEST_PASSWORD` from the environment; never edit `setup.sql` in place. The DSN
+  comes from `SAKILA_MCP_TEST_DSN` or the gitignored `.env.test`. Never print the DSN or
+  password.
 - That server: `require_secure_transport=OFF` (TLS still negotiated), `lower_case_table_names=0`,
   `explain_json_format_version=1` by default and session-settable to 2, so both EXPLAIN
   JSON shapes are testable. No VECTOR type (the `embeddings` fixture is 9.0+ only, so its

@@ -190,11 +190,13 @@ uv sync
 uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest
 ```
 
-Integration tests need a MySQL server prepared with `tests/integration/setup.sql`.
-Replace `CHANGE_ME` (password) and `CLIENT_HOST` (where the tests connect from), run it
-as an admin account, then point the tests at it:
+Integration tests need a MySQL server prepared once with `tests/integration/setup.sh`.
+Give it the address the server sees the tests connect from and a letters-and-digits
+password (extra arguments go to the `mysql` client), then point the tests at the server:
 
 ```sh
+SAKILA_MCP_TEST_CLIENT_HOST=127.0.0.1 SAKILA_MCP_TEST_PASSWORD=<password> \
+  tests/integration/setup.sh -u root -p
 echo 'SAKILA_MCP_TEST_DSN=mysql://sakila_mcp_test:<password>@<host>:3306/sakila_mcp_test' > .env.test
 ```
 
