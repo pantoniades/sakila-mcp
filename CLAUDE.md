@@ -83,6 +83,12 @@ sqlglot (30.x, MySQL dialect):
   `SHOW BINARY LOG STATUS`, `SHOW KEYS IN t IN db` (fall back to `Command`). Hence
   token-level INTO/locking checks and a hand-written SHOW matcher.
 - Import `Token`, `TokenType` from `sqlglot.tokenizer_core`; type trees as `exp.Expr`.
+- sqlglot starts a `--` comment before any Unicode whitespace; MySQL only before ASCII
+  whitespace or a control character. `--<NBSP>` hid the rest of the line from the classifier
+  but not from the server. `_check_lexing` re-scans the gaps between tokens with MySQL's
+  rules and refuses (`ambiguous_comment`); never trust sqlglot's idea of a comment alone.
+- Function-call names may be non-ASCII or start with `$`, and `"\u017f".upper() == "S"`:
+  builtin/keyword matching is ASCII-only, everything else is an unknown function.
 - The tokenizer assumes backslash escapes and `"` = string. Session init therefore
   strips `NO_BACKSLASH_ESCAPES`, `ANSI_QUOTES` and `ANSI` from the session sql_mode and
   fails closed if they stick.
@@ -92,6 +98,8 @@ mysql-connector-python (26.x):
   `conn_attrs` dict, the attribute block exceeds 255 bytes, and the connector's 1-byte
   length encoding crashes. `pool.Database` is our own small pool with a fresh
   `connect_args()` per connection.
+- `connect_args` removes `ClientFlag.MULTI_STATEMENTS`: the default flags allow it, and the
+  server then runs a hidden second statement before the connector complains.
 - Auth-plugin name on failure is read defensively from connector internals
   (`_authenticator._auth_strategy.name`, then `_handshake["auth_plugin"]`). Never make
   a second login attempt to diagnose (account lockout risk).
