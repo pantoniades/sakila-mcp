@@ -51,6 +51,16 @@ def test_insert_refused_by_read_only_session(database: Database) -> None:
     assert info.value.errno == 1792
 
 
+def test_second_statement_refused_by_the_server(database: Database) -> None:
+    # Protocol-level backstop: whatever the classifier decided, the server must not run
+    # a second statement.
+    with database.connection() as cnx:
+        cursor = cnx.cursor()
+        with pytest.raises(mysql.connector.Error) as info:
+            cursor.execute("SELECT 1; SELECT 2")
+    assert info.value.errno == 1064
+
+
 def test_session_variables(database: Database, config: Config) -> None:
     with database.connection() as cnx:
         cursor = cnx.cursor()

@@ -8,6 +8,7 @@ from typing import Any
 
 import mysql.connector
 from mysql.connector.connection import MySQLConnection
+from mysql.connector.constants import ClientFlag
 
 from sakila_mcp import __version__
 from sakila_mcp.capabilities import Capabilities, probe
@@ -43,6 +44,9 @@ def connect_args(config: Config) -> dict[str, Any]:
         "autocommit": True,
         "charset": "utf8mb4",
         "connection_timeout": CONNECT_TIMEOUT_S,
+        # The classifier admits one statement. If it and the server ever disagree about
+        # where a statement ends, the server must refuse the second one, not run it.
+        "client_flags": [-ClientFlag.MULTI_STATEMENTS],
         # Keep values short: the whole attribute block must stay under 255 bytes.
         "conn_attrs": {"program_name": "sakila-mcp", "sakila_mcp_version": __version__},
     }

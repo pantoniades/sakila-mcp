@@ -4,6 +4,8 @@ from typing import Any
 
 import mysql.connector
 import pytest
+from mysql.connector.connection import MySQLConnection
+from mysql.connector.constants import ClientFlag
 
 from sakila_mcp import __version__
 from sakila_mcp.config import Config
@@ -86,6 +88,15 @@ def test_connect_args() -> None:
     assert args["conn_attrs"] == {"program_name": "sakila-mcp", "sakila_mcp_version": __version__}
     assert args["autocommit"] is True
     assert (args["host"], args["port"], args["user"]) == ("db", 3307, "mcp")
+
+
+def test_multi_statements_are_disabled_at_the_protocol_level() -> None:
+    # Second line of defence: even if the classifier and the server disagree about where a
+    # statement ends, the server must refuse a second statement.
+    args = connect_args(Config(user="mcp", password=PASSWORD))
+    cnx = MySQLConnection()
+    cnx.client_flags = args["client_flags"]
+    assert not cnx._client_flags & ClientFlag.MULTI_STATEMENTS
 
 
 def test_auth_error_names_plugin_and_hides_password() -> None:
