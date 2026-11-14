@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # The workflows pin every action to a commit SHA; this keeps the pins (and the version
+  # comments next to them) current. Review each bump before merging: a pin is only as
+  # good as the commit it names.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Skip releases younger than a week, which is when a hijacked release is usually
+    # noticed and pulled.
+    cooldown:
+      default-days: 7
