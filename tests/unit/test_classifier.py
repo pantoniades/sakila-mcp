@@ -365,3 +365,126 @@ def test_column_lists_are_not_function_calls() -> None:
     )
     assert result.unknown_functions == []
     assert result.tables == []
+
+
+# --------------------------------------------------------------------------- lexer agreement
+# The classifier must see exactly what the server sees. MySQL starts a "--" comment only
+# when it is followed by ASCII whitespace or a control character; sqlglot also accepts
+# non-ASCII whitespace, which would hide the rest of the line from the classifier only.
+# Non-ASCII characters are built with chr() so they stay visible in review.
+
+NON_ASCII_SPACES = [0xA0, 0x2028, 0x3000, 0x85, 0x2003, 0x1680]
+
+
+@pytest.mark.parametrize("code", NON_ASCII_SPACES)
+def test_dash_comment_with_non_ascii_space_refused(code: int) -> None:
+    char = chr(code)
+    sql = (
+        f"SELECT 1 FROM (SELECT 1 AS `{char}`) x WHERE 1 --{char} UNION SELECT user FROM mysql.user"
+    )
+    assert _refused(sql).code == "ambiguous_comment"
+
+
+@pytest.mark.parametrize("char", [" ", "\t", "\x0b", "\x0c", "\x7f", "\x01", "\r"])
+def test_dash_comment_with_ascii_space_or_control_accepted(char: str) -> None:
+    _accepted(f"SELECT 1 --{char}trailing comment")
+
+
+@pytest.mark.parametrize("sql", ["SELECT 1 --", "SELECT 1 --\n", "SELECT 1 -- x\n"])
+def test_dash_comment_at_end_accepted(sql: str) -> None:
+    _accepted(sql)
+
+
+@pytest.mark.parametrize("code", NON_ASCII_SPACES)
+def test_non_ascii_whitespace_between_tokens_refused(code: int) -> None:
+    char = chr(code)
+    assert _refused(f"SELECT{char}1").code == "ambiguous_comment"
+    assert _refused(f"SELECT 1{char}").code == "ambiguous_comment"
+
+
+@pytest.mark.parametrize(
+    "tail", ["/* -- */", f"# --{chr(0xA0)}", f"/* {chr(0xA0)} */", f"AS a /* {chr(0x2028)} */"]
+)
+def test_non_ascii_inside_other_constructs_is_not_a_gap_problem(tail: str) -> None:
+    _accepted(f"SELECT 1 {tail}")
+
+
+def test_non_ascii_inside_string_literal_accepted() -> None:
+    _accepted(f"SELECT '--{chr(0xA0)}' AS a")
+
+
+# --------------------------------------------------------------------------- unknown functions
+LONG_S = chr(0x17F)  # upper-cases to "S" in Python, but is not the ASCII letter
+DZE = chr(0x455)  # Cyrillic lookalike of "s"
+E_ACUTE = chr(0xE9)
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        f"SELECT {E_ACUTE}()",
+        f"SELECT caf{E_ACUTE}(1)",
+        f"SELECT {LONG_S}um(1)",
+        f"SELECT {DZE}um(1)",
+        "SELECT $f(1)",
+        f"SELECT sakila_mcp_test.{E_ACUTE}(1)",
+        f"SELECT 1 FROM t WHERE a = f{chr(0xFC)}(1)",
+    ],
+)
+def test_non_ascii_or_dollar_function_names_are_unknown(sql: str) -> None:
+    result = _accepted(sql)
+    assert result.unknown_functions
+    assert not result.functions
+
+
+def test_non_ascii_lookalike_of_denied_function_refused() -> None:
+    assert _refused(f"SELECT {LONG_S}leep(1)").code == "denied_function"
+
+
+# --------------------------------------------------------------------------- SET_VAR anywhere
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT /*+ BKA(t) */ /*+ SET_VAR(max_execution_time=0) */ 1",
+        "SELECT DISTINCT /*+ SET_VAR(sql_mode='') */ 1",
+        "SELECT 1 /*+ SET_VAR(sql_mode='') */",
+        "SELECT 1 FROM t /*+ set_var(sql_mode='') */",
+        "SELECT 1 /* SET_VAR(a=1) */",
+        "SELECT 'SET_VAR(a=1)'",
+        "SELECT /*+ SET_VAR\n(sql_mode='') */ 1",
+    ],
+)
+def test_set_var_refused_anywhere(sql: str) -> None:
+    assert _refused(sql).code == "set_var_hint"
+
+
+# --------------------------------------------------------------------------- robustness
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT " + "(" * 500 + "1" + ")" * 500,
+        "SELECT " + "NOT " * 5000 + "1",
+        "SELECT " + "-" * 5000 + "1",
+    ],
+)
+def test_pathological_nesting_is_a_refusal_not_a_crash(sql: str) -> None:
+    assert _refused(sql).code == "too_complex"
+
+
+@pytest.mark.parametrize(
+    "sql", ["(SELECT 1)", "((SELECT 1))", "(SELECT 1) UNION (SELECT 2)", "(SELECT a FROM t)"]
+)
+def test_parenthesized_select_accepted(sql: str) -> None:
+    assert _accepted(sql).kind is Kind.SELECT
+
+
+@pytest.mark.parametrize(
+    "sql",
+    ["(DELETE FROM t)", "((UPDATE t SET a=1))", "(SELECT 1 FOR UPDATE)", "(SELECT 1 INTO @a)"],
+)
+def test_parenthesized_non_reads_still_refused(sql: str) -> None:
+    assert isinstance(classify(sql), Refusal)

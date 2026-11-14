@@ -96,8 +96,11 @@ _STRING_TOKENS = frozenset(t for t in TokenType if t.name.endswith("STRING")) | 
     TokenType.NUMBER,
     TokenType.PARAMETER,
 }
-_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
-_SET_VAR_RE = re.compile(r"\bSET_VAR\s*\(", re.IGNORECASE)
+# Unicode-aware on purpose: MySQL accepts non-ASCII letters and a leading "$" in unquoted
+# function names, and a call the scanner skips would escape the unknown-function check.
+_NAME_RE = re.compile(r"^[\w$]+$")
+_SET_VAR_RE = re.compile(r"SET_VAR", re.IGNORECASE)
+_ASCII_WHITESPACE = " \t\n\r\x0b\x0c"
 _MAX_EXEC_RE = re.compile(r"\bMAX_EXECUTION_TIME\s*\(([^)]*)\)", re.IGNORECASE)
 
 _SUGGEST_READ = "Use a single SELECT, SHOW, DESCRIBE or EXPLAIN statement."
@@ -109,11 +112,31 @@ def _refuse(code: str, reason: str, suggestion: str = _SUGGEST_READ) -> Refusal:
 
 def classify(sql: str) -> Classification | Refusal:
     """Classify one SQL statement as an accepted read, or return a Refusal."""
+    try:
+        return _classify(sql)
+    except RecursionError:
+        return _refuse(
+            "too_complex",
+            "The statement is nested too deeply to analyse, so it is refused.",
+            "Simplify the query: fewer nested parentheses, subqueries or chained operators.",
+        )
+
+
+def _classify(sql: str) -> Classification | Refusal:
     if "/*!" in sql:
         return _refuse(
             "version_comment",
             "MySQL version comments (/*! ... */) are not allowed.",
             "Remove the /*! ... */ comment; write the SQL it contains directly.",
+        )
+    # Raw text, so it also catches a SET_VAR that sqlglot reads as a plain comment (MySQL
+    # honours optimizer hints only in specific positions, and the two parsers could
+    # disagree about which comment is a hint). SET_VAR could lift the session limits.
+    if _SET_VAR_RE.search(sql):
+        return _refuse(
+            "set_var_hint",
+            "The SET_VAR optimizer hint is not allowed; it changes session settings.",
+            "Remove the SET_VAR hint. Other optimizer hints are allowed.",
         )
     try:
         tokens = sqlglot.tokenize(sql, read="mysql")
@@ -125,6 +148,7 @@ def classify(sql: str) -> Classification | Refusal:
     multi = _check_single_statement(sql, tokens)
     if multi is not None:
         return multi
+    all_tokens = tokens
     if tokens[-1].token_type is TokenType.SEMICOLON:
         tokens = tokens[:-1]
         if not tokens:
@@ -136,6 +160,12 @@ def classify(sql: str) -> Classification | Refusal:
             "statement_not_allowed",
             f"{first} statements are not allowed; this server is read-only.",
         )
+
+    # After the first-word check: sqlglot's COMMAND tokens (CALL, LOCK TABLES, ...) have
+    # unreliable spans, and those statements are refused above with a clearer reason.
+    lexing = _check_lexing(sql, all_tokens)
+    if lexing is not None:
+        return lexing
 
     token_refusal = _check_tokens(tokens)
     if token_refusal is not None:
@@ -161,6 +191,57 @@ def _parse_error(exc: Exception) -> Refusal:
         f"The statement could not be parsed, so it is refused: {detail}",
         "Check the SQL syntax. Only standard MySQL SELECT/SHOW/DESCRIBE/EXPLAIN is accepted.",
     )
+
+
+def _ambiguous_comment() -> Refusal:
+    return _refuse(
+        "ambiguous_comment",
+        "The statement contains a comment or whitespace that MySQL may read differently "
+        "from this server's SQL parser, so it is refused.",
+        "Remove non-ASCII whitespace; write comments as '-- ' (with a space), '#' or /* */.",
+    )
+
+
+def _check_lexing(sql: str, tokens: list[Token]) -> Refusal | None:
+    """Require that everything between tokens is whitespace or a comment, by MySQL's rules.
+
+    sqlglot decides what is a comment; MySQL decides what runs. They differ: MySQL starts
+    a ``--`` comment only before ASCII whitespace or a control character, while sqlglot
+    also accepts non-ASCII whitespace such as NBSP, so ``-- <NBSP>UNION SELECT ...`` would
+    be invisible to the classifier but executed by the server. Re-scanning the gaps with
+    MySQL's rules turns any such disagreement into a refusal.
+    """
+    position = 0
+    for token in [*tokens, None]:
+        end = len(sql) if token is None else token.start
+        if not _gap_is_clean(sql, position, end):
+            return _ambiguous_comment()
+        if token is not None:
+            position = token.end + 1
+    return None
+
+
+def _gap_is_clean(sql: str, start: int, end: int) -> bool:
+    i = start
+    while i < end:
+        char = sql[i]
+        if char in _ASCII_WHITESPACE:
+            i += 1
+        elif char == "#" or sql.startswith("--", i):
+            if char == "-":
+                after = sql[i + 2 : i + 3]
+                if after and ord(after) > 0x20 and ord(after) != 0x7F:
+                    return False
+            newline = sql.find("\n", i, end)
+            i = end if newline == -1 else newline + 1
+        elif sql.startswith("/*", i):
+            close = sql.find("*/", i + 2, end)
+            if close == -1:
+                return False
+            i = close + 2
+        else:
+            return False
+    return True
 
 
 def _check_single_statement(sql: str, tokens: list[Token]) -> Refusal | None:
@@ -213,13 +294,6 @@ def _check_hints(tokens: list[Token]) -> int | Refusal | None:
     for tok in tokens:
         if tok.token_type is not TokenType.HINT:
             continue
-        # SET_VAR could override the per-session limits and sql_mode pinned at checkout.
-        if _SET_VAR_RE.search(tok.text):
-            return _refuse(
-                "set_var_hint",
-                "The SET_VAR optimizer hint is not allowed; it changes session settings.",
-                "Remove the SET_VAR hint. Other optimizer hints are allowed.",
-            )
         for match in _MAX_EXEC_RE.finditer(tok.text):
             arg = match.group(1).strip()
             if not arg.isdigit():
@@ -458,7 +532,7 @@ def _classify_parsed(
 def _kind_of(tree: exp.Expr, first: str) -> Kind | Refusal:
     if first == "TABLE":
         return Kind.TABLE
-    if isinstance(tree, exp.Select | exp.SetOperation):
+    if isinstance(tree, exp.Select | exp.SetOperation | exp.Subquery):
         return Kind.SELECT
     if isinstance(tree, exp.Values):
         return Kind.VALUES
@@ -565,11 +639,14 @@ def _scan_function_calls(
             if full not in unknown:
                 unknown.append(full)
             continue
-        if not quoted and name in BUILTIN_FUNCTIONS:
+        # isascii(): U+017F upper-cases to "S", so "<U+017F>um" would match SUM here while
+        # MySQL sees a different (stored) function.
+        ascii_name = not quoted and tok.text.isascii()
+        if ascii_name and name in BUILTIN_FUNCTIONS:
             if name not in functions:
                 functions.append(name)
             continue
-        if not quoted and name in PAREN_KEYWORDS:
+        if ascii_name and name in PAREN_KEYWORDS:
             continue
         if _is_column_list(tokens, i, cte_names, alias_names):
             continue
