@@ -84,6 +84,10 @@ INSERT INTO blobs (id, payload, raw_bin, big_text) VALUES
   (1, STRING_TO_VECTOR('[1.0, 2.0, 3.0]')),
   (2, STRING_TO_VECTOR('[0.5, 0.25, 0.125]')) */;
 
+-- InnoDB recalculates statistics in the background after a bulk load, so a test that
+-- runs right after this script (CI) could see stale row estimates in EXPLAIN.
+ANALYZE TABLE numbers, customer, orders, blobs;
+
 USE sakila_mcp_other;
 
 CREATE TABLE secret (
