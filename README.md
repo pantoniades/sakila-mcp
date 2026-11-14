@@ -7,6 +7,9 @@ anything.
 Status: work in progress, v0.1, not yet released. What's described here works today.
 Expect the interface to change.
 
+> sakila-mcp is a general-purpose MySQL MCP server for any MySQL database. It is named
+> after Sakila, the MySQL dolphin mascot, and is not specific to the Sakila sample database.
+>
 > Independent open-source project. Not affiliated with, sponsored by or endorsed by
 > Oracle. MySQL is a trademark of Oracle and/or its affiliates.
 

@@ -1,7 +1,7 @@
 [project]
 name = "sakila-mcp"
 version = "0.1.0"
-description = "Read-only MySQL MCP server with a SQL safety layer and structured results."
+description = "General-purpose read-only MySQL MCP server with a SQL safety layer and structured results."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
