@@ -104,7 +104,9 @@ async def test_params_leave_percent_literals_alone(database: Database, config: C
 
 async def test_params_with_year_column(database: Database, config: Config) -> None:
     # Regression: the connector's binary-protocol cursor crashes decoding YEAR.
-    result = await _run(database, config, "SELECT YEAR('2024-01-01'), ?", params=[None])
+    # CAST, not YEAR(): the function's result is typed YEAR on 8.4+ but BIGINT on 8.0,
+    # where the test would not exercise a YEAR column at all.
+    result = await _run(database, config, "SELECT CAST(2024 AS YEAR), ?", params=[None])
     assert result["columns"][0]["type"] == "year"
     assert result["rows"] == [[2024, None]]
 
