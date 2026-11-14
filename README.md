@@ -1,17 +1,57 @@
 # sakila-mcp
 
-A read-only MySQL server (currently) for MCP clients (Claude Code, Claude Desktop, anything that speaks MCP over stdio). Point it at one MySQL server and an LLM agent can look at the
-schema and run bounded SELECT / SHOW / EXPLAIN queries, without being able to change
-anything.
-
-Status: work in progress, v0.1, not yet released. What's described here works today.
-Expect the interface to change.
+sakila-mcp is an MCP server that lets an LLM agent inspect and query any MySQL database,
+read-only, with a fail-closed SQL classifier between the agent and the server.
 
 > sakila-mcp is a general-purpose MySQL MCP server for any MySQL database. It is named
 > after Sakila, the MySQL dolphin mascot, and is not specific to the Sakila sample database.
 >
 > Independent open-source project. Not affiliated with, sponsored by or endorsed by
 > Oracle. MySQL is a trademark of Oracle and/or its affiliates.
+
+Status: v0.1, the first release. What's described here works today. Expect the interface
+to change.
+
+## Quickstart
+
+You need [uv](https://docs.astral.sh/uv/) and a MySQL account that can only read (the
+grants are under [Safety model](#safety-model)).
+
+```sh
+cat > ~/.config/sakila-mcp.toml <<'EOF'
+host = "db.example.internal"
+user = "sakila_mcp"
+password = "..."
+database_allowlist = ["app_db"]
+EOF
+chmod 600 ~/.config/sakila-mcp.toml
+
+claude mcp add sakila -- uvx sakila-mcp --config ~/.config/sakila-mcp.toml
+```
+
+Then ask "what's in app_db and how do orders relate to customers?" or "why is this query
+slow?". Any MCP client that speaks stdio works; see [Use it](#use-it).
+
+<!-- TODO before the first release: "## What it looks like", a short transcript of a real
+agent session (tool calls and results verbatim, cuts marked with …). Do not write one by
+hand. -->
+
+## What makes it different
+
+- It fails closed. A statement the classifier can't parse is refused, and so is any
+  function that isn't a known MySQL built-in.
+- It doesn't trust one lexer. Comments are re-scanned with MySQL's own rules, because a
+  parser and the server can disagree about where a comment ends.
+- A refusal is a result, not an error: a code, a reason and a suggestion, so the agent
+  can rephrase instead of giving up.
+- Everything is bounded without touching your SQL: rows, cell size and execution time
+  are capped, and no `LIMIT` is ever added to a query.
+- The classifier isn't the only layer. Sessions are read-only transactions, re-initialised
+  on every checkout, and the connection can't send more than one statement.
+- It knows MySQL's release lines (LTS, Innovation, calendar versions) and reads both
+  `EXPLAIN FORMAT=JSON` shapes.
+- It says where it stops: the database allowlist is a name filter, and the real boundary
+  is the account's grants.
 
 ## What it does
 
@@ -34,7 +74,8 @@ dates and times as ISO 8601, JSON parsed, binary as `<binary N bytes>`. Long cel
 cut at `max_cell_bytes` with a marker saying how big they were.
 
 When the server says no, the agent gets a result with `refused: true`, a reason and a
-suggestion, not an error, so it can rephrase. Mistakes (unknown table, bad SQL) and
+suggestion, not an error, so it can rephrase. That includes SQL the classifier can't
+parse. Mistakes MySQL reports (unknown table or column, wrong parameter count) and
 infrastructure failures are tool errors.
 
 ## Safety model
@@ -79,19 +120,21 @@ The password never appears in tool results, logs or error text. There's a test f
 
 ## Requirements
 
-- Python 3.12 and [uv](https://docs.astral.sh/uv/)
-- MySQL 8.0 or later. Tested against 8.4 currently, will test on 9.7 and Innovation. 
+- Python 3.12 or later and [uv](https://docs.astral.sh/uv/)
+- MySQL 8.4 or later. CI runs the integration tests against 8.4, 9.7 and 26.10.
+  8.0 is tested best-effort: failures there don't block a release, and functions that
+  exist only in 8.0 are refused as unknown.
 
 ## Install
 
-Not on PyPI yet. From a checkout:
+Nothing to install: `uvx sakila-mcp` downloads and runs the latest release. Pin a version
+with `uvx sakila-mcp@0.1.0`, or install it with `uv tool install sakila-mcp`.
 
 ```sh
-git clone https://github.com/pantoniades/sakila-mcp.git
-cd sakila-mcp
-uv sync
-uv run sakila-mcp --help
+uvx sakila-mcp --help
 ```
+
+To run from a checkout instead, see [Development](#development).
 
 ## Configure
 
@@ -126,8 +169,7 @@ database_allowlist = ["app_db"]   # empty = every non-system database
 Claude Code:
 
 ```sh
-claude mcp add sakila -- uv run --directory /path/to/sakila-mcp sakila-mcp \
-  --config ~/.config/sakila-mcp.toml
+claude mcp add sakila -- uvx sakila-mcp --config ~/.config/sakila-mcp.toml
 ```
 
 Claude Desktop (`claude_desktop_config.json`):
@@ -136,9 +178,8 @@ Claude Desktop (`claude_desktop_config.json`):
 {
   "mcpServers": {
     "sakila": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/sakila-mcp", "sakila-mcp",
-               "--config", "/home/you/.config/sakila-mcp.toml"]
+      "command": "uvx",
+      "args": ["sakila-mcp", "--config", "/home/you/.config/sakila-mcp.toml"]
     }
   }
 }
@@ -159,9 +200,8 @@ It reads the same `mcpServers` format as Claude Desktop. Save this as, say,
 {
   "mcpServers": {
     "sakila": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/sakila-mcp", "sakila-mcp",
-               "--config", "/home/you/.config/sakila-mcp.toml"]
+      "command": "uvx",
+      "args": ["sakila-mcp", "--config", "/home/you/.config/sakila-mcp.toml"]
     }
   }
 }
@@ -189,6 +229,8 @@ lock diagnostics, Enterprise Edition features, `EXPLAIN ANALYZE`, stored functio
 ## Development
 
 ```sh
+git clone https://github.com/pantoniades/sakila-mcp.git
+cd sakila-mcp
 uv sync
 uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest
 ```
