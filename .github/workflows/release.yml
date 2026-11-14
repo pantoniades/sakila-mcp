@@ -38,7 +38,7 @@ jobs:
   # The whole CI matrix, on the tagged commit. Its build job uploads the "dist" artifact,
   # so what gets published is exactly what was checked.
   ci:
-    uses: ./.github/workflows/ci.yml
+    uses: $/.github/workflows/ci.yml
     permissions:
       contents: read
 
