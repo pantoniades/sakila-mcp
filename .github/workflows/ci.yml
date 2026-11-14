@@ -1,0 +1,172 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Weekly run with upgraded dependencies and whatever patch release the MySQL image
+  # tags point at by then, so upstream breakage shows up here before users report it.
+  schedule:
+    - cron: "17 5 * * 1"
+  # release.yml calls this workflow and publishes the artifact the build job uploads.
+  workflow_call:
+
+# No job here needs more than a read-only checkout, and no repository secret is used:
+# the database passwords below exist only inside the runner. Pull requests from forks
+# therefore run exactly the same jobs with nothing to steal.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: ruff, mypy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+          enable-cache: false
+      - name: Install
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = schedule ]; then uv sync --upgrade; else uv sync --locked; fi
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync ruff format --check .
+      - run: uv run --no-sync mypy
+
+  unit:
+    name: unit (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # uvx picks whichever Python >= 3.12 the user has, so test each of them.
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: false
+      - name: Install
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = schedule ]; then uv sync --upgrade; else uv sync --locked; fi
+      - run: uv run --no-sync pytest tests/unit
+
+  integration:
+    name: integration (MySQL ${{ matrix.mysql }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # 8.0 is past end of life and tested best-effort: its result is reported but never
+    # blocks a merge or a release.
+    continue-on-error: ${{ matrix.best_effort }}
+    strategy:
+      fail-fast: false
+      matrix:
+        mysql: ["8.4", "9.7", "26.10"]
+        best_effort: [false]
+        include:
+          - mysql: "8.0"
+            best_effort: true
+    services:
+      mysql:
+        # Minor-version tags on purpose: the point is to test the current patch release.
+        # These images are test targets only and never touch the build or the release.
+        image: mysql:${{ matrix.mysql }}
+        env:
+          # Not a secret: the container is reachable only from this runner and is
+          # destroyed with it.
+          MYSQL_ROOT_PASSWORD: ci-root-not-a-secret
+        ports:
+          - 3306:3306
+        # Over TCP: while the image initialises it runs a temporary server on the socket
+        # only, which must not count as ready.
+        options: >-
+          --health-cmd "mysql -h 127.0.0.1 -uroot -pci-root-not-a-secret -e 'SELECT 1'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 36
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+          enable-cache: false
+      - name: Install
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = schedule ]; then uv sync --upgrade; else uv sync --locked; fi
+      - name: Prepare the test schemas and account
+        run: |
+          set -euo pipefail
+          mysql --version
+          # Admin login for the mysql client. setup.sh passes its arguments after
+          # --table, where --defaults-extra-file is not accepted, and -p cannot prompt
+          # without a terminal, so the login lives in the default option file.
+          umask 077
+          cat > "$HOME/.my.cnf" <<'EOF'
+          [client]
+          host=127.0.0.1
+          port=3306
+          user=root
+          password=ci-root-not-a-secret
+          EOF
+          password=$(openssl rand -hex 16)
+          echo "::add-mask::$password"
+          # '%': the server sees this runner through the Docker bridge, not as 127.0.0.1.
+          SAKILA_MCP_TEST_CLIENT_HOST=% SAKILA_MCP_TEST_PASSWORD="$password" \
+            tests/integration/setup.sh
+          # CI only, so that the connection-attributes test runs instead of skipping.
+          mysql -e "GRANT SELECT ON performance_schema.* TO 'sakila_mcp_test'@'%'"
+          echo "SAKILA_MCP_TEST_DSN=mysql://sakila_mcp_test:$password@127.0.0.1:3306/sakila_mcp_test" >> "$GITHUB_ENV"
+      - run: uv run --no-sync pytest tests/integration
+
+  build:
+    name: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+          enable-cache: false
+      - run: uv build
+      - name: Check what ships
+        run: |
+          set -euo pipefail
+          tar tzf dist/*.tar.gz > contents.txt
+          unzip -Z1 dist/*.whl >> contents.txt
+          cat contents.txt
+          # Local notes, agent instructions and credentials must never be published.
+          if grep -E -i '(^|/)(\.env|claude|kickoff|next_steps)|\.local\.md$' contents.txt; then
+            echo "::error::the files listed above must not be in the sdist or wheel"
+            exit 1
+          fi
+      - name: Run the wheel the way uvx would
+        # Outside the project, dependencies resolved fresh: uv.lock does not reach users.
+        run: |
+          wheel=$(realpath dist/*.whl)
+          cd "$RUNNER_TEMP"
+          uvx --from "$wheel" sakila-mcp --version
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: |
+            dist/*.tar.gz
+            dist/*.whl
+          if-no-files-found: error
+          retention-days: 7
