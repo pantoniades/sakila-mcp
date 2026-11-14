@@ -9,13 +9,30 @@ authors = [
     { name = "Philip Antoniades", email = "philip@antoniades.com" }
 ]
 requires-python = ">=3.12"
+keywords = ["mcp", "mysql", "model-context-protocol", "read-only"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Database",
+    "Typing :: Typed",
+]
 dependencies = [
     "mcp>=2,<3",
     "mysql-connector-python>=26.7.0",
     "pydantic>=2",
     "pydantic-settings>=2.16.1",
-    "sqlglot>=30.24.0",
+    # The classifier depends on sqlglot's tokenizer behaviour, verified on 30.x only.
+    # uvx users resolve fresh (uv.lock does not reach them), so cap the major version.
+    "sqlglot>=30.24.0,<31",
 ]
+
+[project.urls]
+Repository = "https://github.com/pantoniades/sakila-mcp"
+Issues = "https://github.com/pantoniades/sakila-mcp/issues"
 
 [project.scripts]
 sakila-mcp = "sakila_mcp.__main__:main"
@@ -23,6 +40,11 @@ sakila-mcp = "sakila_mcp.__main__:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# Explicit list: without it the sdist takes every file not in .gitignore, so a local
+# note or credentials file would ship the day its ignore rule is missing.
+[tool.hatch.build.targets.sdist]
+only-include = ["src", "tests", "README.md", "LICENSE", "pyproject.toml", "uv.lock"]
 
 [dependency-groups]
 dev = [

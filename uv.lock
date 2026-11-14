@@ -1018,7 +1018,7 @@ requires-dist = [
     { name = "mysql-connector-python", specifier = ">=26.7.0" },
     { name = "pydantic", specifier = ">=2" },
     { name = "pydantic-settings", specifier = ">=2.16.1" },
-    { name = "sqlglot", specifier = ">=30.24.0" },
+    { name = "sqlglot", specifier = ">=30.24.0,<31" },
 ]
 
 [package.metadata.requires-dev]
