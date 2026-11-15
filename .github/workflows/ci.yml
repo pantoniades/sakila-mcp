@@ -8,6 +8,8 @@ on:
   # tags point at by then, so upstream breakage shows up here before users report it.
   schedule:
     - cron: "17 5 * * 1"
+  # The same upgraded-dependency run on demand, e.g. to re-check after fixing a failure.
+  workflow_dispatch:
   # release.yml calls this workflow and publishes the artifact the build job uploads.
   workflow_call:
 
@@ -17,9 +19,11 @@ on:
 permissions:
   contents: read
 
+# Only a newer push to the same pull request cancels a run. Pushes to main, the weekly
+# run and release runs each finish, so every commit on main keeps its own result.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -36,7 +40,10 @@ jobs:
           enable-cache: false
       - name: Install
         run: |
-          if [ "$GITHUB_EVENT_NAME" = schedule ]; then uv sync --upgrade; else uv sync --locked; fi
+          case "$GITHUB_EVENT_NAME" in
+            schedule|workflow_dispatch) uv sync --upgrade ;;
+            *) uv sync --locked ;;
+          esac
       - run: uv run --no-sync ruff check .
       - run: uv run --no-sync ruff format --check .
       - run: uv run --no-sync mypy
@@ -60,7 +67,10 @@ jobs:
           enable-cache: false
       - name: Install
         run: |
-          if [ "$GITHUB_EVENT_NAME" = schedule ]; then uv sync --upgrade; else uv sync --locked; fi
+          case "$GITHUB_EVENT_NAME" in
+            schedule|workflow_dispatch) uv sync --upgrade ;;
+            *) uv sync --locked ;;
+          esac
       - run: uv run --no-sync pytest tests/unit
 
   integration:
@@ -106,7 +116,10 @@ jobs:
           enable-cache: false
       - name: Install
         run: |
-          if [ "$GITHUB_EVENT_NAME" = schedule ]; then uv sync --upgrade; else uv sync --locked; fi
+          case "$GITHUB_EVENT_NAME" in
+            schedule|workflow_dispatch) uv sync --upgrade ;;
+            *) uv sync --locked ;;
+          esac
       - name: Prepare the test schemas and account
         run: |
           set -euo pipefail
@@ -131,6 +144,10 @@ jobs:
           mysql -e "GRANT SELECT ON performance_schema.* TO 'sakila_mcp_test'@'%'"
           echo "SAKILA_MCP_TEST_DSN=mysql://sakila_mcp_test:$password@127.0.0.1:3306/sakila_mcp_test" >> "$GITHUB_ENV"
       - run: uv run --no-sync pytest tests/integration
+        env:
+          # Without a DSN the integration tests skip, which would leave this job green
+          # with nothing tested. Here a missing DSN is an error.
+          SAKILA_MCP_TEST_REQUIRE_DSN: "1"
 
   build:
     name: build
@@ -152,7 +169,7 @@ jobs:
           unzip -Z1 dist/*.whl >> contents.txt
           cat contents.txt
           # Local notes, agent instructions and credentials must never be published.
-          if grep -E -i '(^|/)(\.env|claude|kickoff|next_steps)|\.local\.md$' contents.txt; then
+          if grep -E '(^|/)(CLAUDE[^/]*\.md|KICKOFF_PROMPT\.md|NEXT_STEPS[^/]*|\.env[^/]*|[^/]*\.local\.md)$' contents.txt; then
             echo "::error::the files listed above must not be in the sdist or wheel"
             exit 1
           fi

@@ -5,7 +5,7 @@ The target server must have been prepared with tests/integration/setup.sql.
 
 import os
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlsplit
@@ -30,7 +30,7 @@ class Dsn:
     host: str
     port: int
     user: str
-    password: str
+    password: str = field(repr=False)  # keep it out of pytest's --showlocals output
 
 
 def _read_dsn_with_source() -> tuple[str, str] | None:
@@ -88,6 +88,10 @@ def pytest_terminal_summary(terminalreporter: Any) -> None:
 def dsn() -> Dsn:
     raw = _read_dsn()
     if not raw:
+        # CI sets this: there, a missing DSN means the setup step broke, and skipping
+        # every test would report success with nothing tested.
+        if os.environ.get("SAKILA_MCP_TEST_REQUIRE_DSN"):
+            pytest.fail("SAKILA_MCP_TEST_DSN is required here but not set")
         pytest.skip("SAKILA_MCP_TEST_DSN not set (env or .env.test)")
     parts = urlsplit(raw)
     password = unquote(parts.password or "")
