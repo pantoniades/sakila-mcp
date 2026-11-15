@@ -65,6 +65,9 @@ MCP SDK v2 (mcp 2.3.0):
   with snake_case too (`ToolAnnotations(read_only_hint=True)`; `populate_by_name=True`);
   the wire form is still camelCase (`readOnlyHint`).
 - Sync `def` tools run on worker threads (right for the blocking connector).
+- Output schemas must not contain a JSON Schema `format`. A `datetime` field emits
+  `format: "date-time"`, MySQL's values have no UTC offset, and Claude Code then rejects the
+  whole result. Temporal values are ISO 8601 strings; a unit test enforces this.
 - `read_resource()` returns `Iterable[...] | InputRequiredResult`; narrow it.
 - In-process `MCPServer.call_tool()` *raises* `ToolError`; only the protocol layer turns
   it into `isError: true` (text prefixed `Error executing tool <name>: `, no structured
@@ -134,8 +137,19 @@ mysql-connector-python (26.x):
 - A second target is a local MySQL 26.10.0 Community (Innovation) server: it has VECTOR
   (the `embeddings` test runs) and its EXPLAIN JSON v2 wraps the plan in `query_plan`
   (`json_schema_version` 2.1). Select a server with `SAKILA_MCP_TEST_DSN`; the pytest summary
-  prints which server and DSN source a run used. No 9.0–9.6 or 9.7 server is available to the
-  tests.
+  prints which server and DSN source a run used. No 9.0–9.6 or 9.7 server is available
+  locally; 9.7 is covered by CI.
+- CI (`.github/workflows/ci.yml`) runs the integration tests against the official `mysql`
+  images 8.4, 9.7 and 26.10 (gating) and 8.0 (best-effort, never blocks). It uses no
+  repository secrets. A missing DSN there is an error, not a skip.
+- Releases: bump `version` in `pyproject.toml`, push, wait for green CI, then push the tag
+  `v<version>`. `release.yml` publishes to PyPI by trusted publishing after a manual approval
+  of the `pypi` environment. `v*` tags are locked on GitHub once pushed (ruleset, no bypass),
+  so check `git ls-remote --tags origin` first. `v0.1.0` exists there on a pre-CI commit and
+  was never published; the first PyPI release is 0.1.1.
+- `uv run pytest -m llm` runs an opt-in smoke test through Claude Code (`claude -p`). Run it
+  before a release: Claude Code validates tool results against the output schema more
+  strictly than the Python client the other tests use.
 - Host-specific details (server names, addresses) live in the gitignored `CLAUDE.local.md`.
 
 ## Working style
