@@ -22,7 +22,9 @@ the standalone `fastmcp` package. If you are unsure of a v2 API, read the docs o
 - Do not add a dependency without asking.
 
 ## Safety model (never weaken, never bypass "temporarily")
-- v0.1 is read-only, period. No write path exists in the codebase.
+- v0.1 is read-only, period. No write path exists in the codebase. (The long-term goal is
+  a full read/write server with DBA features; when a write mode comes it is opt-in, uses
+  separate tools, and read-only stays the default. Do not start it without being asked.)
 - Every session: `SET SESSION TRANSACTION READ ONLY`, `max_execution_time`, small
   `lock_wait_timeout`, connection attributes identifying the server.
 - Every statement from `run_query` passes the sqlglot classifier. Parse failure =

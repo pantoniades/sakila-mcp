@@ -9,8 +9,8 @@ read-only, with a fail-closed SQL classifier between the agent and the server.
 > Independent open-source project. Not affiliated with, sponsored by or endorsed by
 > Oracle. MySQL is a trademark of Oracle and/or its affiliates.
 
-Status: v0.1, the first release. What's described here works today. Expect the interface
-to change.
+Status: v0.1 (0.1.1 is the first release on PyPI). What's described here works today.
+Expect the interface to change.
 
 ## Quickstart
 
@@ -203,16 +203,17 @@ It reads the same `mcpServers` format as Claude Desktop. Save this as, say,
 }
 ```
 
-and start it with a model that supports tool calling:
+and start it with a model that supports tool calling. `ollama show <model>` lists `tools`
+under Capabilities, and https://ollama.com/search?c=tools lists the models that have it:
 
 ```sh
-ollmcp -j ~/.config/sakila-mcp.ollmcp.json -m qwen3.5
+ollmcp -j ~/.config/sakila-mcp.ollmcp.json -m <model>
 ```
 
-`/tools` inside ollmcp turns individual tools on and off. Model size matters more here
-than with Claude: small models (1–3B) often call the wrong tool, invent arguments, or stop
-after one call. That's a model problem, not a safety one. The server enforces the same
-rules whatever is calling it.
+`/tools` inside ollmcp turns individual tools on and off. Model choice matters more here
+than with a hosted model: a model that is too small may call the wrong tool, invent
+arguments, or stop after one call. If that happens, try a larger one. That's a model
+problem, not a safety one. The server enforces the same rules whatever is calling it.
 
 Then ask it things like "what's in app_db and how do orders relate to customers?" or
 "why is this query slow?".
