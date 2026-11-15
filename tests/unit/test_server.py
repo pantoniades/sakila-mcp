@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -8,7 +9,28 @@ from mcp.client import Client
 from sakila_mcp import __version__
 from sakila_mcp.config import Config
 from sakila_mcp.pool import Database
-from sakila_mcp.server import CAPABILITIES_URI, SERVER_NAME, SERVER_TITLE, build_server
+from sakila_mcp.server import (
+    CAPABILITIES_URI,
+    SERVER_NAME,
+    SERVER_TITLE,
+    build_server,
+    utc_offset,
+)
+
+
+@pytest.mark.parametrize(
+    ("diff", "expected"),
+    [
+        (timedelta(0), "+00:00"),
+        (timedelta(hours=1), "+01:00"),
+        (timedelta(hours=-5, minutes=-30), "-05:30"),
+        (timedelta(hours=13, minutes=45), "+13:45"),
+        (None, None),
+        ("01:00:00", None),
+    ],
+)
+def test_utc_offset(diff: object, expected: str | None) -> None:
+    assert utc_offset(diff) == expected
 
 
 def _format_keywords(node: object) -> list[str]:

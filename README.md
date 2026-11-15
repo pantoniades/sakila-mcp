@@ -55,7 +55,7 @@ Six tools, all read-only:
 
 | Tool | Returns |
 |---|---|
-| `server_info` | MySQL version and release line (LTS / Innovation), uptime, key globals (buffer pool, binlog format, GTID mode, read_only, sql_mode, charset), and the sakila-mcp version. |
+| `server_info` | MySQL version and release line (LTS / Innovation), uptime, session time zone, key globals (buffer pool, binlog format, GTID mode, read_only, sql_mode, charset), and the sakila-mcp version. |
 | `list_databases` | Databases you're allowed to query, system schemas flagged. |
 | `list_tables` | Tables and views in one database: engine, approximate rows, data and index size. |
 | `describe_table` | Columns, indexes (key parts in order, uniqueness, cardinality), foreign keys, engine, row format, collation. |

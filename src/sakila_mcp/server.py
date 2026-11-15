@@ -4,7 +4,8 @@ import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
-from typing import Annotated, Literal
+from datetime import timedelta
+from typing import Annotated, Any, Literal
 
 import mysql.connector
 from mcp.server import MCPServer
@@ -121,6 +122,17 @@ def _as_int(value: str | None) -> int | None:
     return int(value) if value is not None and value.lstrip("-").isdigit() else None
 
 
+def utc_offset(diff: object) -> str | None:
+    """Format TIMEDIFF(NOW(), UTC_TIMESTAMP()), which the connector returns as a
+    timedelta, as +HH:MM. None if the value is not one."""
+    if not isinstance(diff, timedelta):
+        return None
+    minutes = round(diff.total_seconds() / 60)
+    sign = "-" if minutes < 0 else "+"
+    hours, rest = divmod(abs(minutes), 60)
+    return f"{sign}{hours:02d}:{rest:02d}"
+
+
 def _as_bool(value: str | None) -> bool | None:
     return None if value is None else value.upper() in {"ON", "1"}
 
@@ -140,8 +152,8 @@ def build_server(config: Config, database: Database) -> MCPServer:  # noqa: PLR0
 
     @server.tool(
         annotations=READ_ONLY,
-        description="Returns the MySQL version, release line, uptime and key global settings "
-        "(buffer pool, binlog/GTID, read_only, sql_mode, charset). "
+        description="Returns the MySQL version, release line, uptime, session time zone and "
+        "key global settings (buffer pool, binlog/GTID, read_only, sql_mode, charset). "
         "Use it first to learn what kind of server you are talking to.",
     )
     def server_info() -> ServerInfo:
@@ -157,6 +169,12 @@ def build_server(config: Config, database: Database) -> MCPServer:  # noqa: PLR0
             values = {_text(name).lower(): _text(value) for name, value in cursor.fetchall()}
             cursor.execute("/* sakila-mcp tool=server_info */ SHOW GLOBAL STATUS LIKE 'Uptime'")
             row = cursor.fetchone()
+            cursor.execute(
+                "/* sakila-mcp tool=server_info */ SELECT @@SESSION.time_zone, "
+                "@@GLOBAL.system_time_zone, TIMEDIFF(NOW(), UTC_TIMESTAMP())"
+            )
+            zone_row: Any = cursor.fetchone()
+            time_zone, system_time_zone, diff = zone_row
             cursor.close()
         return ServerInfo(
             sakila_mcp_version=__version__,
@@ -165,6 +183,9 @@ def build_server(config: Config, database: Database) -> MCPServer:  # noqa: PLR0
             release_line=caps.release_line,
             version_comment=caps.version_comment,
             uptime_seconds=int(_text(row[1])) if row else 0,
+            time_zone=_text(time_zone),
+            system_time_zone=_text(system_time_zone),
+            utc_offset=utc_offset(diff),
             innodb_buffer_pool_size=_as_int(values.get("innodb_buffer_pool_size")),
             binlog_format=values.get("binlog_format"),
             gtid_mode=values.get("gtid_mode"),

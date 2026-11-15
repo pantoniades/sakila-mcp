@@ -73,7 +73,7 @@ class TableDescription(BaseModel):
     # format "date-time" (RFC 3339, offset required) makes strict clients such as
     # Claude Code reject the whole result.
     create_time: str | None = Field(
-        description="ISO 8601, in the server session's time zone (no offset)."
+        description="ISO 8601 without an offset, in the session time zone that server_info reports."
     )
     comment: str
     columns: list[Column]

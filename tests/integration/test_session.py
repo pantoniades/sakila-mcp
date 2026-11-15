@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -155,6 +156,9 @@ async def test_server_info_tool(database: Database, config: Config) -> None:
     assert info["version_raw"] == database.capabilities.version_raw
     assert info["version"] == list(database.capabilities.version)
     assert info["uptime_seconds"] > 0
+    assert info["time_zone"] == _scalar(database, "SELECT @@SESSION.time_zone")
+    assert info["system_time_zone"]
+    assert re.fullmatch(r"[+-]\d\d:\d\d", info["utc_offset"])
     assert info["max_connections"] > 0
     assert isinstance(info["read_only"], bool)
     assert info["character_set_server"]
