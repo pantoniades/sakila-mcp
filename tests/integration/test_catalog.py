@@ -1,5 +1,7 @@
 """Step 4: list_databases, list_tables, describe_table."""
 
+from datetime import datetime
+
 import pytest
 
 from sakila_mcp.config import Config
@@ -69,7 +71,7 @@ async def test_describe_customer(database: Database, config: Config) -> None:
     assert result["table_type"] == "BASE TABLE"
     assert result["engine"] == "InnoDB"
     assert result["collation"] == "utf8mb4_0900_ai_ci"
-    assert result["create_time"] is not None
+    assert datetime.fromisoformat(result["create_time"]).tzinfo is None
     columns = {c["name"]: c for c in result["columns"]}
     assert [c["name"] for c in result["columns"]] == [
         "id",

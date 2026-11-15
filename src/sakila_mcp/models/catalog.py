@@ -1,8 +1,6 @@
 """Output models for schema-inspection tools."""
 
-from datetime import datetime
-
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DatabaseEntry(BaseModel):
@@ -71,7 +69,12 @@ class TableDescription(BaseModel):
     row_format: str | None
     collation: str | None
     approx_rows: int | None
-    create_time: datetime | None
+    # A string, not datetime: MySQL reports this without a time zone, and a schema of
+    # format "date-time" (RFC 3339, offset required) makes strict clients such as
+    # Claude Code reject the whole result.
+    create_time: str | None = Field(
+        description="ISO 8601, in the server session's time zone (no offset)."
+    )
     comment: str
     columns: list[Column]
     indexes: list[Index]

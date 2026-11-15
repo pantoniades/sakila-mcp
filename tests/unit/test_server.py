@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -30,6 +31,9 @@ async def test_tools_registered_read_only() -> None:
         assert tool.annotations.read_only_hint is True
         assert tool.description
         assert tool.output_schema is not None
+        # MySQL temporal values carry no time zone, and clients that validate results
+        # against the schema reject a "date-time" without an offset (RFC 3339).
+        assert '"date-time"' not in json.dumps(tool.output_schema)
 
 
 @pytest.mark.anyio

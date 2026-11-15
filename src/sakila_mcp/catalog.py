@@ -111,7 +111,7 @@ def describe_table(cursor: Any, database: str, table: str) -> TableDescription |
         row_format=_opt_text(row_format),
         collation=_opt_text(collation),
         approx_rows=_opt_int(rows),
-        create_time=create_time if isinstance(create_time, datetime) else None,
+        create_time=create_time.isoformat() if isinstance(create_time, datetime) else None,
         comment="" if kind == "VIEW" else text(comment or ""),
         columns=_columns(cursor, params),
         indexes=_indexes(cursor, params),
