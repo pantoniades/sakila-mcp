@@ -27,7 +27,7 @@ from sakila_mcp.safety.redact import redact
 
 from .conftest import TEST_DB, Dsn
 
-pytestmark = pytest.mark.llm
+pytestmark = [pytest.mark.integration, pytest.mark.llm]
 
 SERVER = "mysql"
 TOOLS = (
@@ -38,6 +38,8 @@ TOOLS = (
     "run_query",
     "explain_query",
 )
+# What Claude Code puts in a tool result when the structured content fails validation.
+SCHEMA_ERROR = "does not match the tool's output schema"
 WRITE = f"DELETE FROM {TEST_DB}.write_probe WHERE id = 1"
 # Deliberately not SAKILA_MCP_*: the server must only see it under the name set below.
 PASSWORD_VAR = "SAKILA_LLM_SMOKE_PASSWORD"
@@ -115,23 +117,27 @@ def _run_claude(dsn: Dsn, workdir: Path) -> str:
         command += ["--model", model]
     # The server must run with exactly the settings above, not with whatever
     # SAKILA_MCP_* happens to be exported in the developer's shell.
-    env = {k: v for k, v in os.environ.items() if not k.startswith("SAKILA_MCP_")}
-    env[PASSWORD_VAR] = dsn.password
+    inherited = {k: v for k, v in os.environ.items() if not k.startswith("SAKILA_MCP_")}
     try:
         # An empty working directory, so the agent does not read this project's CLAUDE.md
         # and behaves like a client that has never seen the server.
         done = subprocess.run(
             command,
             cwd=workdir,
-            env=env,
+            env={**inherited, PASSWORD_VAR: dsn.password},
             capture_output=True,
             text=True,
             timeout=TIMEOUT_S,
             check=False,
         )
-    except subprocess.TimeoutExpired:
-        pytest.fail(f"claude did not finish within {TIMEOUT_S} s")
-    assert done.returncode == 0, redact(done.stderr[-2000:])
+    except subprocess.TimeoutExpired as exc:
+        partial = exc.stdout.decode("utf-8", "replace") if exc.stdout else ""
+        pytest.fail(
+            f"claude did not finish within {TIMEOUT_S} s; output so far ends with:\n"
+            + redact(partial)[-2000:]
+        )
+    # Redact first, then cut: a secret split by the cut would no longer be recognised.
+    assert done.returncode == 0, redact(done.stderr)[-2000:]
     return done.stdout
 
 
@@ -140,7 +146,7 @@ def test_claude_code_accepts_every_tool_result(dsn: Dsn, tmp_path: Path) -> None
         pytest.skip("claude CLI not found")
     stdout = _run_claude(dsn, tmp_path)
     # A bool first: asserting on the strings would print the password on failure.
-    leaked = dsn.password in stdout
+    leaked = bool(dsn.password) and dsn.password in stdout
     assert not leaked, "the test password appears in Claude Code's output"
 
     calls: dict[str, tuple[str, dict[str, Any]]] = {}  # tool_use id -> (tool, input)
@@ -173,17 +179,27 @@ def test_claude_code_accepts_every_tool_result(dsn: Dsn, tmp_path: Path) -> None
     missing = [tool for tool in TOOLS if tool not in called]
     assert not missing, f"the model never called {missing}; it called {called}"
 
-    # Every call here is valid, so any error result is a failure: a result the client
-    # rejected against the output schema, a tool error, or no result at all.
-    problems = []
-    for call_id, (tool, _) in calls.items():
-        text, is_error = results.get(call_id, ("<no result>", True))
-        if is_error:
-            problems.append(f"{tool}: {redact(text[:300])}")
-    assert not problems, "these calls did not return a result:\n" + "\n".join(problems)
+    # The check this test exists for: the client must not reject any result against
+    # the tool's output schema.
+    rejected = [
+        f"{calls[call_id][0]}: {redact(text)[:300]}"
+        for call_id, (text, _) in results.items()
+        if call_id in calls and SCHEMA_ERROR in text
+    ]
+    assert not rejected, "the client rejected these results:\n" + "\n".join(rejected)
+
+    # Each tool must also have worked at least once. One failed call is not a failure:
+    # the model may get an argument wrong, receive a tool error and retry.
+    worked = {
+        tool
+        for call_id, (tool, _) in calls.items()
+        if call_id in results and not results[call_id][1]
+    }
+    failed = [tool for tool in TOOLS if tool not in worked]
+    assert not failed, f"no successful result from {failed}"
 
     writes = [
-        results[call_id][0]
+        results.get(call_id, ("<no result>", True))[0]
         for call_id, (tool, args) in calls.items()
         if tool == "run_query" and "DELETE" in str(args.get("sql", "")).upper()
     ]
@@ -192,7 +208,9 @@ def test_claude_code_accepts_every_tool_result(dsn: Dsn, tmp_path: Path) -> None
         try:
             refusal = json.loads(text)
         except json.JSONDecodeError:
-            pytest.fail(f"the DELETE did not return a structured result: {redact(text[:300])}")
+            refusal = None
+        if not isinstance(refusal, dict):
+            pytest.fail(f"the DELETE did not return a structured result: {redact(text)[:300]}")
         # Tools that can refuse return a union, which the SDK wraps as {"result": ...}.
         refusal = refusal.get("result", refusal)
         assert refusal.get("refused") is True
