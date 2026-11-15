@@ -77,7 +77,10 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+# "not llm": tests that drive a real model cost money and are not deterministic, so
+# they only run when asked for with `pytest -m llm` (a later -m replaces this one).
+addopts = "-ra --strict-markers -m 'not llm'"
 markers = [
     "integration: requires a live MySQL (SAKILA_MCP_TEST_DSN)",
+    "llm: drives a real model through a real MCP client; opt-in with -m llm",
 ]
