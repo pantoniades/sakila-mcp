@@ -1,4 +1,3 @@
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +9,21 @@ from sakila_mcp import __version__
 from sakila_mcp.config import Config
 from sakila_mcp.pool import Database
 from sakila_mcp.server import CAPABILITIES_URI, SERVER_NAME, SERVER_TITLE, build_server
+
+
+def _format_keywords(node: object) -> list[str]:
+    """Every JSON Schema ``format`` keyword in a schema (a string value; a property that
+    happens to be named "format" has a schema, i.e. a dict, as its value)."""
+    found: list[str] = []
+    if isinstance(node, dict):
+        if isinstance(node.get("format"), str):
+            found.append(node["format"])
+        for child in node.values():
+            found += _format_keywords(child)
+    elif isinstance(node, list):
+        for child in node:
+            found += _format_keywords(child)
+    return found
 
 
 @pytest.mark.anyio
@@ -31,9 +45,10 @@ async def test_tools_registered_read_only() -> None:
         assert tool.annotations.read_only_hint is True
         assert tool.description
         assert tool.output_schema is not None
-        # MySQL temporal values carry no time zone, and clients that validate results
-        # against the schema reject a "date-time" without an offset (RFC 3339).
-        assert '"date-time"' not in json.dumps(tool.output_schema)
+        # Clients that validate results against the schema enforce "format" strictly
+        # (a "date-time" without a UTC offset is rejected, and MySQL's values have
+        # none), so temporal values are plain strings in every output model.
+        assert _format_keywords(tool.output_schema) == []
 
 
 @pytest.mark.anyio
