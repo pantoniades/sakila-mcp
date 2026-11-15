@@ -32,10 +32,6 @@ claude mcp add sakila -- uvx sakila-mcp --config ~/.config/sakila-mcp.toml
 Then ask "what's in app_db and how do orders relate to customers?" or "why is this query
 slow?". Any MCP client that speaks stdio works; see [Use it](#use-it).
 
-<!-- TODO before the first release: "## What it looks like", a short transcript of a real
-agent session (tool calls and results verbatim, cuts marked with …). Do not write one by
-hand. -->
-
 ## What makes it different
 
 - It fails closed. A statement the classifier can't parse is refused, and so is any
@@ -246,3 +242,11 @@ echo 'SAKILA_MCP_TEST_DSN=mysql://sakila_mcp_test:<password>@<host>:3306/sakila_
 ```
 
 `.env.test` is gitignored. Without it the integration tests skip.
+
+One test is opt-in: it drives Claude Code (`claude -p`) through every tool against the
+test server and checks that the client accepts each result. It needs the `claude` CLI,
+uses your account, and never runs in CI:
+
+```sh
+uv run pytest -m llm
+```
