@@ -38,7 +38,8 @@ Issues = "https://github.com/pantoniades/sakila-mcp/issues"
 sakila-mcp = "sakila_mcp.__main__:main"
 
 [build-system]
-requires = ["hatchling"]
+# Exact version: the published wheel is built by this tool, and uv.lock does not cover it.
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 # Explicit list: without it the sdist takes every file not in .gitignore, so a local
