@@ -9,7 +9,7 @@ from typing import Annotated, Any, Literal
 
 import mysql.connector
 from mcp.server import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.mcpserver.exceptions import ResourceError, ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
@@ -139,7 +139,7 @@ def _as_bool(value: str | None) -> bool | None:
 
 # One closure per tool keeps registration static and in one place; hence the length.
 def build_server(config: Config, database: Database) -> MCPServer:  # noqa: PLR0915
-    """Build the MCP server for one MySQL target. ``database`` must be opened before use."""
+    """Build the MCP server for one MySQL target. ``database`` connects on first use."""
     allowlist = config.database_allowlist
     database_pool = database  # tools take a ``database`` argument that shadows the name
     server = MCPServer(
@@ -157,8 +157,10 @@ def build_server(config: Config, database: Database) -> MCPServer:  # noqa: PLR0
         "Use it first to learn what kind of server you are talking to.",
     )
     def server_info() -> ServerInfo:
-        caps = database.capabilities
+        # Inside _mysql_errors: the first call is the one that connects, and an
+        # unhandled DatabaseError would reach the model as a bare "Error executing tool".
         with _mysql_errors(), database.connection() as cnx:
+            caps = database.capabilities
             cursor = cnx.cursor()
             placeholders = ", ".join(["%s"] * len(_SERVER_INFO_VARIABLES))
             cursor.execute(
@@ -303,6 +305,12 @@ def build_server(config: Config, database: Database) -> MCPServer:  # noqa: PLR0
         mime_type="application/json",
     )
     def capabilities() -> str:
-        return json.dumps({"sakila_mcp_version": __version__, **asdict(database.capabilities)})
+        try:
+            caps = database.capabilities
+        except DatabaseError as exc:
+            # ResourceError reaches the client with its message; any other exception is
+            # reported as a crash with the text withheld.
+            raise ResourceError(str(exc)) from None
+        return json.dumps({"sakila_mcp_version": __version__, **asdict(caps)})
 
     return server

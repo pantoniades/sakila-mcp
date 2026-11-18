@@ -106,7 +106,13 @@ def _requested_auth_plugin(cnx: MySQLConnection) -> str:
 
 
 class Database:
-    """Owns a small connection pool. ``open()`` must succeed before tools can run.
+    """Owns a small connection pool. Connects lazily, on the first use that needs MySQL.
+
+    Nothing connects at construction: the server must start, answer ``initialize`` and
+    list its tools even when MySQL is down or unconfigured (MCP directories and clients
+    introspect a server without a database). A failed first connect raises
+    ``DatabaseError`` and is retried by the next call, so a server started before its
+    database recovers on its own. ``open()`` connects eagerly.
 
     Not mysql.connector's MySQLConnectionPool: its config check opens a C-extension
     connection that adds keys to the shared ``conn_attrs`` dict, pushing the attribute
@@ -118,15 +124,37 @@ class Database:
         self._config = config
         self._slots = threading.BoundedSemaphore(config.pool_size)
         self._lock = threading.Lock()
+        # Serializes the first connect only (see _ensure_open); never held while a
+        # connection is in use, so it cannot block queries once capabilities are known.
+        self._open_lock = threading.Lock()
         self._idle: list[MySQLConnection] = []
         self._capabilities: Capabilities | None = None
         self._closed = False
 
     @property
     def capabilities(self) -> Capabilities:
-        if self._capabilities is None:
-            raise DatabaseError("database is not open")
-        return self._capabilities
+        """Probed on first use. Raises DatabaseError if MySQL cannot be reached."""
+        return self._ensure_open()
+
+    def _ensure_open(self) -> Capabilities:
+        if self._closed:
+            raise DatabaseError("database is closed")
+        caps = self._capabilities
+        if caps is not None:
+            return caps
+        # Tool calls run on worker threads. A connect to a dead host takes up to
+        # CONNECT_TIMEOUT_S, so concurrent first calls queue here and the later ones
+        # reuse the first one's result, instead of each opening a connection that would
+        # then be parked in the idle list beyond pool_size.
+        with self._open_lock:
+            if self._capabilities is not None:
+                return self._capabilities
+            try:
+                return self.open()
+            except DatabaseError as exc:
+                # The tool error reaches the client; this is for whoever reads stderr.
+                log.warning("MySQL is not available: %s", exc)
+                raise
 
     def open(self) -> Capabilities:
         """Connect once to verify credentials and probe capabilities."""
@@ -158,8 +186,7 @@ class Database:
     @contextmanager
     def connection(self) -> Iterator[MySQLConnection]:
         """Check out a connection with a freshly initialized read-only session."""
-        if self._capabilities is None or self._closed:
-            raise DatabaseError("database is not open")
+        self._ensure_open()
         # A busy slot frees within one statement timeout (max_execution_time), plus
         # room for a reconnect, so waiting longer than that means something is wrong.
         wait_s = self._config.statement_timeout_ms / 1000 + CONNECT_TIMEOUT_S

@@ -165,6 +165,19 @@ async def test_server_info_tool(database: Database, config: Config) -> None:
 
 
 @pytest.mark.anyio
+async def test_first_tool_call_connects_lazily(config: Config) -> None:
+    db = Database(config)  # never opened: the first call must connect and probe
+    try:
+        result = await build_server(config, db).call_tool("server_info", {})
+        assert isinstance(result, CallToolResult)
+        assert not result.is_error
+        assert result.structured_content is not None
+        assert result.structured_content["version_raw"] == db.capabilities.version_raw
+    finally:
+        db.close()
+
+
+@pytest.mark.anyio
 async def test_capabilities_resource(database: Database, config: Config) -> None:
     server = build_server(config, database)
     result = await server.read_resource(CAPABILITIES_URI)

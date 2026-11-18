@@ -77,8 +77,13 @@ MCP SDK v2 (mcp 2.3.0):
 - A tool returning `Model | Refusal` gets an output schema wrapped as `{"result": ...}`.
 - The stdio server exits on stdin EOF and abandons in-flight requests. Tests must keep
   stdin open until the response arrives.
-- No async lifespan: `main()` opens `Database` before `run("stdio")` and passes it to
-  `build_server(config, database)`.
+- No async lifespan: `main()` builds `Database` and passes it to `build_server(config, database)`.
+  Nothing connects at startup: `Database` connects and probes capabilities on the first call
+  that needs MySQL (`_ensure_open`), so the server lists its tools with MySQL down (MCP
+  directories introspect it that way). A failed connect is a tool error, not remembered, and
+  retried by the next call. Anything reading `database.capabilities` can therefore raise
+  `DatabaseError`: keep it inside `_mysql_errors()` (tools) or convert it (the resource), or
+  the model sees a bare "Error executing tool".
 
 sqlglot (30.x, MySQL dialect):
 - Function names are normalized (`NVL`/`IFNULL` → `COALESCE`, `STRING_AGG` →

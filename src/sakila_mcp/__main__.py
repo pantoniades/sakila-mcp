@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from sakila_mcp import __version__
 from sakila_mcp.config import Config, load_config
-from sakila_mcp.pool import Database, DatabaseError
+from sakila_mcp.pool import Database
 from sakila_mcp.safety.redact import RedactingFilter, redact_exception, register_secret
 from sakila_mcp.server import build_server
 
@@ -62,14 +62,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = _parse_args(argv)
     _configure_logging()
     config = _load(args.config)
+    # No connect here: the server must start and list its tools while MySQL is down or
+    # not yet reachable (directory checks, clients that launch it before the database).
+    # The first tool call connects and, if that fails, returns the error to the caller.
     database = Database(config)
-    try:
-        database.open()
-    except DatabaseError as exc:
-        log.error("%s", exc)
-        raise SystemExit(1) from None
     server = build_server(config, database)
-    log.info("sakila-mcp %s starting on stdio", __version__)
+    log.info("sakila-mcp %s starting on stdio; MySQL connects on first use", __version__)
     try:
         server.run("stdio")
     finally:
