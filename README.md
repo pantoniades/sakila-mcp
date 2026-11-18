@@ -126,7 +126,7 @@ The password never appears in tool results, logs or error text. There's a test f
 ## Install
 
 Nothing to install: `uvx sakila-mcp` downloads and runs the latest release. Pin a version
-with `uvx sakila-mcp@0.1.1`, or install it with `uv tool install sakila-mcp`.
+with `uvx sakila-mcp@0.1.2`, or install it with `uv tool install sakila-mcp`.
 
 ```sh
 uvx sakila-mcp --help
