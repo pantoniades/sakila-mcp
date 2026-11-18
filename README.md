@@ -1,5 +1,7 @@
 # sakila-mcp
 
+<!-- mcp-name: io.github.pantoniades/sakila-mcp -->
+
 sakila-mcp is an MCP server that lets an LLM agent inspect and query any MySQL database,
 read-only, with a fail-closed SQL classifier between the agent and the server.
 
@@ -159,6 +161,10 @@ database_allowlist = ["app_db"]   # empty = every non-system database
 | `statement_timeout_ms` | `SAKILA_MCP_STATEMENT_TIMEOUT_MS` | `10000` | session `max_execution_time` |
 | `pool_size` | `SAKILA_MCP_POOL_SIZE` | `4` | |
 | `read_only` | `SAKILA_MCP_READ_ONLY` | `true` | `false` refuses to start; there is no write mode |
+
+The server connects to MySQL on the first tool call, not at startup. It starts and lists
+its tools even when MySQL is down; a wrong host or password shows up as a tool error on
+the first call (and in stderr), and the next call tries again.
 
 ## Use it
 

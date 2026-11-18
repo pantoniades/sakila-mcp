@@ -1,0 +1,57 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.pantoniades/sakila-mcp",
+  "title": "Sakila MCP",
+  "description": "Read-only MySQL MCP server with a fail-closed SQL classifier and structured results.",
+  "repository": {
+    "url": "https://github.com/pantoniades/sakila-mcp",
+    "source": "github"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "sakila-mcp",
+      "version": "0.1.1",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "SAKILA_MCP_USER",
+          "description": "MySQL account name. Give it read-only grants.",
+          "isRequired": true,
+          "format": "string"
+        },
+        {
+          "name": "SAKILA_MCP_PASSWORD",
+          "description": "Password of the MySQL account. Empty if the account has none.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "SAKILA_MCP_HOST",
+          "description": "MySQL host.",
+          "isRequired": false,
+          "format": "string",
+          "default": "127.0.0.1"
+        },
+        {
+          "name": "SAKILA_MCP_PORT",
+          "description": "MySQL port.",
+          "isRequired": false,
+          "format": "number",
+          "default": "3306"
+        },
+        {
+          "name": "SAKILA_MCP_DATABASE_ALLOWLIST",
+          "description": "Comma-separated databases the agent may query. Empty means every non-system database.",
+          "isRequired": false,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}
